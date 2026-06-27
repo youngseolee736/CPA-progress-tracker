@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CPA Progress Tracker</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container">
+        <p class="eyebrow">CPA study planner</p>
+        <h1>CPA Progress Tracker</h1>
+        <p class="app-description">
+          Organize CPA exam topics, track study status, and quickly see what still needs review.
+        </p>
+      </div>
+    </header>
+
+    <main class="container app-layout">
+      <section class="card dashboard-section" aria-labelledby="dashboard-title">
+        <div class="section-heading">
+          <h2 id="dashboard-title">Dashboard Summary</h2>
+          <p>Progress at a glance.</p>
+        </div>
+
+        <div class="dashboard-grid" id="dashboard-summary" aria-live="polite">
+          <article class="stat-card">
+            <span class="stat-label">Total Topics</span>
+            <strong class="stat-value" id="total-topics">0</strong>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Not Started</span>
+            <strong class="stat-value" id="not-started-topics">0</strong>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">In Progress</span>
+            <strong class="stat-value" id="in-progress-topics">0</strong>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Completed</span>
+            <strong class="stat-value" id="completed-topics">0</strong>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Needs Review</span>
+            <strong class="stat-value" id="review-topics">0</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="card form-section" aria-labelledby="form-title">
+        <div class="section-heading">
+          <h2 id="form-title">Add CPA Topic</h2>
+          <p>Create a topic to include in your study plan.</p>
+        </div>
+
+        <form id="topic-form">
+          <div class="form-grid">
+            <label for="topic-name">
+              Topic name
+              <input id="topic-name" name="topicName" type="text" placeholder="Example: Audit evidence" required />
+            </label>
+
+            <label for="topic-section">
+              CPA section
+              <select id="topic-section" name="topicSection" required>
+                <option value="">Choose a section</option>
+                <option value="AUD">AUD</option>
+                <option value="FAR">FAR</option>
+                <option value="REG">REG</option>
+                <option value="BAR">BAR</option>
+                <option value="ISC">ISC</option>
+                <option value="TCP">TCP</option>
+              </select>
+            </label>
+
+            <label for="topic-status">
+              Starting status
+              <select id="topic-status" name="topicStatus" required>
+                <option value="not-started">Not started</option>
+                <option value="in-progress">In progress</option>
+                <option value="completed">Completed</option>
+              </select>
+            </label>
+          </div>
+
+          <button type="submit" class="primary-button">Add Topic</button>
+        </form>
+      </section>
+
+      <section class="card filters-section" aria-labelledby="filters-title">
+        <div class="section-heading">
+          <h2 id="filters-title">Filters</h2>
+          <p>Narrow the topic list by section or status.</p>
+        </div>
+
+        <div class="filters-grid">
+          <label for="section-filter">
+            Section
+            <select id="section-filter">
+              <option value="all">All sections</option>
+              <option value="AUD">AUD</option>
+              <option value="FAR">FAR</option>
+              <option value="REG">REG</option>
+              <option value="BAR">BAR</option>
+              <option value="ISC">ISC</option>
+              <option value="TCP">TCP</option>
+            </select>
+          </label>
+
+          <label for="status-filter">
+            Status
+            <select id="status-filter">
+              <option value="all">All statuses</option>
+              <option value="not-started">Not started</option>
+              <option value="in-progress">In progress</option>
+              <option value="completed">Completed</option>
+              <option value="review">Needs review</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="card topic-section" aria-labelledby="topics-title">
+        <div class="section-heading">
+          <h2 id="topics-title">Topic List</h2>
+          <p>Review and manage your study topics.</p>
+        </div>
+
+        <div id="topic-list" class="topic-list" aria-live="polite">
+          <p class="empty-state">No topics yet. Add your first CPA topic to begin tracking progress.</p>
+        </div>
+      </section>
+
+      <section class="card reset-section" aria-labelledby="reset-title">
+        <div>
+          <h2 id="reset-title">Reset Planner</h2>
+          <p>Clear all topics and return the tracker to its starting state.</p>
+        </div>
+        <button type="button" id="reset-button" class="danger-button">Reset All</button>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
