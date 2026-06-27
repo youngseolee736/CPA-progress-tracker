@@ -4,11 +4,12 @@ A static front-end app for planning CPA exam study topics, tracking progress, an
 
 ## Live Site
 
-GitHub Pages link: _Add live site URL here._
+GitHub Pages link: https://youngseolee736.github.io/CPA-progress-tracker/
 
 ## Repository
 
-Repository link: _Add repository URL here._
+Repository link:https://youngseolee736.github.io/CPA-progress-tracker/
+
 
 ## How to Use the App
 
