@@ -170,6 +170,36 @@ function getStatusClass(status) {
   return normalizeStatus(status).toLowerCase().replace(/\s+/g, "-");
 }
 
+function getSimpleStatusClass(status) {
+  return getStatusClass(status);
+}
+
+function isExamModule(title) {
+  return title.includes("Mini Exam") || title.includes("Simulated Exam");
+}
+
+function getScoreClass(moduleItem) {
+  if (!isExamModule(moduleItem.title)) {
+    return "score-empty";
+  }
+
+  const score = getEnteredScore(moduleItem);
+
+  if (score === null) {
+    return "score-empty";
+  }
+
+  if (score < 65) {
+    return "score-risk";
+  }
+
+  if (score <= 74) {
+    return "score-warning";
+  }
+
+  return "score-good";
+}
+
 function getSectionProgress(section) {
   if (!progress[section]) {
     progress[section] = {};
@@ -251,7 +281,7 @@ function getEnteredScore(moduleItem) {
 }
 
 function getPriorityScore(moduleItem) {
-  const score = getEnteredScore(moduleItem);
+  const score = isExamModule(moduleItem.title) ? getEnteredScore(moduleItem) : null;
   let priority = 0;
 
   if (moduleItem.needsReview) {
@@ -280,6 +310,7 @@ function getRoadmapStats(section) {
   const total = modules.length;
   const completed = modules.filter((moduleItem) => normalizeStatus(moduleItem.status) === "Completed").length;
   const scoredModules = modules
+    .filter((moduleItem) => isExamModule(moduleItem.title))
     .map((moduleItem) => ({ ...moduleItem, enteredScore: getEnteredScore(moduleItem) }))
     .filter((moduleItem) => moduleItem.enteredScore !== null);
   const reviewCount = modules.filter((moduleItem) => moduleItem.needsReview).length;
@@ -403,8 +434,9 @@ function renderRoadmap() {
 
   modules.forEach((moduleItem) => {
     const isExpanded = expandedModuleId === moduleItem.id;
+    const statusClass = getSimpleStatusClass(moduleItem.status);
     const row = document.createElement("article");
-    row.className = `roadmap-row status-${getStatusClass(moduleItem.status)}${isExpanded ? " is-expanded" : ""}`;
+    row.className = `module-row roadmap-row ${statusClass} status-${statusClass}${isExpanded ? " is-expanded" : ""}`;
 
     const summaryButton = document.createElement("button");
     summaryButton.type = "button";
@@ -420,11 +452,11 @@ function renderRoadmap() {
     titleBlock.append(title);
 
     const statusPill = document.createElement("span");
-    statusPill.className = `status-pill status-${getStatusClass(moduleItem.status)}`;
-    statusPill.textContent = normalizeStatus(moduleItem.status);
+    statusPill.className = `status-pill ${statusClass} status-${statusClass}`;
+    statusPill.textContent = normalizeStatus(moduleItem.status) === "Completed" ? "✓ Completed" : normalizeStatus(moduleItem.status);
 
     const scoreSummary = document.createElement("span");
-    scoreSummary.className = "module-summary-item";
+    scoreSummary.className = `module-summary-item score-summary ${getScoreClass(moduleItem)}`;
     scoreSummary.textContent = getEnteredScore(moduleItem) === null ? "No score" : `Score: ${getEnteredScore(moduleItem)}`;
 
     const dateSummary = document.createElement("span");
@@ -439,7 +471,7 @@ function renderRoadmap() {
 
     if (moduleItem.needsReview) {
       const reviewSummary = document.createElement("span");
-      reviewSummary.className = "review-chip";
+      reviewSummary.className = "review-pill review-chip";
       reviewSummary.textContent = "Review";
       summaryButton.append(reviewSummary);
     }

@@ -230,19 +230,22 @@ h4 {
   background: #eef2f7;
 }
 
-.status-pill {
-  color: var(--muted);
-  background: #f2f4f7;
+.status-pill,
+.status-pill.not-started {
+  color: #475569;
+  background: #f1f5f9;
 }
 
+.status-pill.in-progress,
 .status-pill.status-in-progress {
-  color: var(--warning);
-  background: #fff7e6;
+  color: #92400e;
+  background: #fef3c7;
 }
 
+.status-pill.completed,
 .status-pill.status-completed {
-  color: var(--success);
-  background: #eaf6ef;
+  color: #166534;
+  background: #dcfce7;
 }
 
 form,
@@ -378,13 +381,30 @@ button,
   display: grid;
 }
 
-.roadmap-row {
+.roadmap-row,
+.module-row {
   padding: 0;
   border-top: 1px solid var(--soft-border);
+  border-left: 4px solid transparent;
 }
 
 .roadmap-row:first-child {
   border-top: 0;
+}
+
+.module-row.not-started {
+  background: #f8fafc;
+  border-left-color: #cbd5e1;
+}
+
+.module-row.in-progress {
+  background: #fffbeb;
+  border-left-color: #d97706;
+}
+
+.module-row.completed {
+  background: #ecfdf3;
+  border-left-color: #2f855a;
 }
 
 .module-summary {
@@ -394,7 +414,7 @@ button,
   align-items: center;
   width: 100%;
   min-height: 56px;
-  padding: 11px 0;
+  padding: 11px 12px;
   color: var(--text);
   text-align: left;
   background: transparent;
@@ -403,7 +423,7 @@ button,
 }
 
 .module-summary:hover {
-  background: #fafbfc;
+  background: rgba(255, 255, 255, 0.45);
 }
 
 .module-title-block {
@@ -421,7 +441,8 @@ button,
 
 .module-summary-item,
 .edit-indicator,
-.review-chip {
+.review-chip,
+.review-pill {
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 700;
@@ -432,12 +453,41 @@ button,
   color: var(--primary);
 }
 
-.review-chip {
-  color: var(--warning);
+.review-chip,
+.review-pill {
+  padding: 3px 8px;
+  color: #b42318;
+  background: #fff1f2;
+  border-radius: 999px;
+}
+
+.score-summary {
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.score-empty {
+  color: var(--muted);
+  background: transparent;
+}
+
+.score-risk {
+  color: #b42318;
+  background: #fff1f2;
+}
+
+.score-warning {
+  color: #92400e;
+  background: #fffbeb;
+}
+
+.score-good {
+  color: #166534;
+  background: #ecfdf3;
 }
 
 .module-details {
-  padding: 0 0 14px;
+  padding: 0 12px 14px;
 }
 
 .roadmap-controls {
