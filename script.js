@@ -381,6 +381,12 @@ function getRoadmapStats(section) {
   const modules = getSectionProgress(section);
   const total = modules.length;
   const completed = modules.filter((moduleItem) => normalizeStatus(moduleItem.status) === "Completed").length;
+  const learningModules = modules.filter((moduleItem) => !isExamModule(moduleItem.title));
+  const examModules = modules.filter((moduleItem) => isExamModule(moduleItem.title));
+  const learningTotal = learningModules.length;
+  const examTotal = examModules.length;
+  const learningCompleted = learningModules.filter((m) => normalizeStatus(m.status) === "Completed").length;
+  const examCompleted = examModules.filter((m) => normalizeStatus(m.status) === "Completed").length;
   const scoredModules = modules
     .filter((moduleItem) => isExamModule(moduleItem.title))
     .map((moduleItem) => ({ ...moduleItem, enteredScore: getEnteredScore(moduleItem) }))
@@ -400,10 +406,20 @@ function getRoadmapStats(section) {
       .map((moduleItem) => ({ ...moduleItem, priorityScore: getPriorityScore(moduleItem) }))
       .sort((a, b) => b.priorityScore - a.priorityScore)[0] || null;
 
+  // Weighted progress: 80% learning, 20% exams
+  const learningPercent = learningTotal === 0 ? 0 : (learningCompleted / learningTotal) * 100;
+  const examPercent = examTotal === 0 ? 0 : (examCompleted / examTotal) * 100;
+  const weightedPercent = Math.round(learningPercent * 0.8 + examPercent * 0.2);
+
   return {
     total,
     completed,
-    progressPercent: total === 0 ? 0 : Math.round((completed / total) * 100),
+    // Backwards-compatible key: overall progress percent now uses learning/exam weighting
+    progressPercent: total === 0 ? 0 : weightedPercent,
+    // Expose components for UI or debugging
+    learningPercent: Math.round(learningPercent),
+    examPercent: Math.round(examPercent),
+    weightedPercent,
     averageScore,
     reviewCount,
     weakestModule,
@@ -658,8 +674,27 @@ function renderDashboardOverview(section, stats, overallProgress) {
   document.querySelector("#current-section-progress-bar").style.width = `${isSectionPassed(section) ? 100 : stats.progressPercent}%`;
   document.querySelector("#exam-readiness-output").textContent = `Latest ${latestScore} · Target ${targetScore}`;
   document.querySelector("#score-gap-output").textContent = `${scoreGap} points`;
+  renderCurrentSectionPie(section, stats);
   renderStudyMapPreview();
-  renderCalendarPreview();
+}
+
+function renderCurrentSectionPie(section, stats) {
+  const pie = document.querySelector("#current-section-pie");
+
+  if (!pie) {
+    return;
+  }
+
+  const percent = isSectionPassed(section) ? 100 : stats.progressPercent;
+  const detail = isSectionPassed(section)
+    ? "Passed · 100% complete"
+    : `${stats.completed} / ${stats.total} modules completed`;
+
+  pie.style.setProperty("--section-progress", `${percent}%`);
+  pie.setAttribute("aria-label", `${section} progress ${percent}%`);
+  document.querySelector("#current-section-pie-percent").textContent = `${percent}%`;
+  document.querySelector("#current-section-pie-title").textContent = `${section} progress`;
+  document.querySelector("#current-section-pie-detail").textContent = detail;
 }
 
 function renderStudyMapPreview() {
@@ -676,22 +711,6 @@ function renderStudyMapPreview() {
     .slice(0, 3);
 
   renderPreviewList(previewOutput, modules, "No priority modules yet.");
-}
-
-function renderCalendarPreview() {
-  const previewOutput = document.querySelector("#calendar-preview-output");
-
-  if (!previewOutput) {
-    return;
-  }
-
-  const todayKey = formatIsoDate(getToday());
-  const modules = getSectionProgress(getCurrentSection())
-    .filter((moduleItem) => moduleItem.plannedDate && moduleItem.plannedDate >= todayKey)
-    .sort((a, b) => a.plannedDate.localeCompare(b.plannedDate))
-    .slice(0, 3);
-
-  renderPreviewList(previewOutput, modules, "No planned modules yet.");
 }
 
 function renderPreviewList(container, modules, emptyText) {
@@ -711,6 +730,12 @@ function renderPreviewList(container, modules, emptyText) {
 
     const title = document.createElement("strong");
     title.textContent = moduleItem.title;
+    if (moduleItem.title.includes("Simulated Exam")) {
+      const note = document.createElement("span");
+      note.className = "simulated-note";
+      note.textContent = " — Sleep well before the simulated exam";
+      title.append(note);
+    }
 
     const meta = document.createElement("span");
     meta.textContent = moduleItem.plannedDate ? formatCompactDate(moduleItem.plannedDate) : normalizeStatus(moduleItem.status);
@@ -934,141 +959,196 @@ function renderRoadmap() {
   const section = getCurrentSection();
   const roadmapList = document.querySelector("#roadmap-list");
   const modules = getSectionProgress(section);
+  const learningModules = modules.filter((moduleItem) => !isExamModule(moduleItem.title));
+  const examModules = modules.filter((moduleItem) => isExamModule(moduleItem.title));
 
   roadmapList.innerHTML = "";
+  roadmapList.append(createRoadmapGroup("Learning", "Core modules and topic practice", learningModules));
+  roadmapList.append(createRoadmapGroup("Exams", "Mini exams and simulated exams", examModules));
+  saveProgress();
+}
 
+function createRoadmapGroup(title, subtitle, modules) {
+  const group = document.createElement("section");
+  group.className = "roadmap-group";
+
+  const header = document.createElement("div");
+  header.className = "roadmap-group-header";
+
+  const headingBlock = document.createElement("div");
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+
+  const description = document.createElement("p");
+  description.textContent = subtitle;
+
+  headingBlock.append(heading, description);
+
+  const count = document.createElement("span");
+  count.className = "roadmap-group-count";
+  count.textContent = `${modules.length} items`;
+
+  header.append(headingBlock, count);
+
+  const rows = document.createElement("div");
+  rows.className = "roadmap-group-rows";
   modules.forEach((moduleItem) => {
-    const isExpanded = expandedModuleId === moduleItem.id;
-    const isExam = isExamModule(moduleItem.title);
-    const statusClass = getSimpleStatusClass(moduleItem.status);
-    const row = document.createElement("article");
-    row.className = `module-row roadmap-row ${statusClass} status-${statusClass}${isExpanded ? " is-expanded" : ""}`;
-
-    const summaryButton = document.createElement("button");
-    summaryButton.type = "button";
-    summaryButton.className = "module-summary";
-    summaryButton.setAttribute("aria-expanded", String(isExpanded));
-    summaryButton.setAttribute("aria-controls", `${moduleItem.id}-details`);
-
-    const titleBlock = document.createElement("span");
-    titleBlock.className = "module-title-block";
-    const title = document.createElement("span");
-    title.className = "module-title";
-    title.textContent = moduleItem.title;
-    titleBlock.append(title);
-
-    const statusPill = document.createElement("span");
-    statusPill.className = `status-pill ${statusClass} status-${statusClass}`;
-    statusPill.textContent = normalizeStatus(moduleItem.status) === "Completed" ? "✓ Completed" : normalizeStatus(moduleItem.status);
-
-    const dateSummary = document.createElement("span");
-    dateSummary.className = "module-summary-item";
-    dateSummary.textContent = formatCompactDate(moduleItem.plannedDate);
-
-    const editIndicator = document.createElement("span");
-    editIndicator.className = "edit-indicator";
-    editIndicator.textContent = isExpanded ? "Close" : "Edit";
-
-    summaryButton.append(titleBlock, statusPill);
-
-    if (isExam) {
-      const scoreSummary = document.createElement("span");
-      scoreSummary.className = `module-summary-item score-summary ${getScoreClass(moduleItem)}`;
-      scoreSummary.textContent = getEnteredScore(moduleItem) === null ? "No score" : `Score: ${getEnteredScore(moduleItem)}`;
-      summaryButton.append(scoreSummary);
-    }
-
-    summaryButton.append(dateSummary);
-
-    if (moduleItem.needsReview) {
-      const reviewSummary = document.createElement("span");
-      reviewSummary.className = "review-pill review-chip";
-      reviewSummary.textContent = "Review";
-      summaryButton.append(reviewSummary);
-    }
-
-    summaryButton.append(editIndicator);
-    summaryButton.addEventListener("click", function () {
-      expandedModuleId = isExpanded ? null : moduleItem.id;
-      renderRoadmap();
-    });
-
-    const details = document.createElement("div");
-    details.id = `${moduleItem.id}-details`;
-    details.className = "module-details";
-    details.hidden = !isExpanded;
-
-    const controls = document.createElement("div");
-    controls.className = "roadmap-controls";
-
-    const statusLabel = document.createElement("label");
-    statusLabel.textContent = "Status";
-
-    const statusSelect = document.createElement("select");
-    statusSelect.setAttribute("aria-label", `Status for ${moduleItem.title}`);
-    STATUSES.forEach((status) => {
-      const option = document.createElement("option");
-      option.value = status;
-      option.textContent = formatStatus(status);
-      option.selected = moduleItem.status === status;
-      statusSelect.append(option);
-    });
-    statusSelect.addEventListener("change", function (event) {
-      updateModuleProgress(moduleItem.id, { status: event.target.value }, true);
-    });
-    statusLabel.append(statusSelect);
-
-    const reviewLabel = document.createElement("label");
-    reviewLabel.className = "checkbox-label roadmap-review";
-
-    const reviewCheckbox = document.createElement("input");
-    reviewCheckbox.type = "checkbox";
-    reviewCheckbox.checked = moduleItem.needsReview;
-    reviewCheckbox.addEventListener("change", function (event) {
-      updateModuleProgress(moduleItem.id, { needsReview: event.target.checked }, true);
-    });
-    reviewLabel.append(reviewCheckbox, "Needs Review");
-
-    const dateLabel = document.createElement("label");
-    dateLabel.textContent = "Planned";
-
-    const dateInput = document.createElement("input");
-    dateInput.type = "date";
-    dateInput.value = moduleItem.plannedDate || "";
-    dateInput.setAttribute("aria-label", `Planned date for ${moduleItem.title}`);
-    dateInput.addEventListener("change", function (event) {
-      updateModuleProgress(moduleItem.id, { plannedDate: event.target.value }, true);
-    });
-    dateLabel.append(dateInput);
-
-    controls.append(statusLabel);
-
-    if (isExam) {
-      const scoreLabel = document.createElement("label");
-      scoreLabel.textContent = "Score";
-
-      const scoreInput = document.createElement("input");
-      scoreInput.type = "number";
-      scoreInput.min = "0";
-      scoreInput.max = "100";
-      scoreInput.inputMode = "numeric";
-      scoreInput.placeholder = "0";
-      scoreInput.value = moduleItem.score;
-      scoreInput.setAttribute("aria-label", `Practice score for ${moduleItem.title}`);
-      scoreInput.addEventListener("change", function (event) {
-        updateModuleProgress(moduleItem.id, { score: event.target.value }, true);
-      });
-      scoreLabel.append(scoreInput);
-      controls.append(scoreLabel);
-    }
-
-    controls.append(dateLabel, reviewLabel);
-    details.append(controls);
-    row.append(summaryButton, details);
-    roadmapList.append(row);
+    rows.append(createRoadmapRow(moduleItem));
   });
 
-  saveProgress();
+  group.append(header, rows);
+  return group;
+}
+
+function createRoadmapRow(moduleItem) {
+  const isExpanded = expandedModuleId === moduleItem.id;
+  const isExam = isExamModule(moduleItem.title);
+  const statusClass = getSimpleStatusClass(moduleItem.status);
+  const row = document.createElement("article");
+  row.className = `module-row roadmap-row ${statusClass} status-${statusClass}${isExpanded ? " is-expanded" : ""}`;
+
+  const summaryButton = document.createElement("button");
+  summaryButton.type = "button";
+  summaryButton.className = "module-summary";
+  summaryButton.setAttribute("aria-expanded", String(isExpanded));
+  summaryButton.setAttribute("aria-controls", `${moduleItem.id}-details`);
+
+  const titleBlock = document.createElement("span");
+  titleBlock.className = "module-title-block";
+  const title = document.createElement("span");
+  title.className = "module-title";
+  title.textContent = moduleItem.title;
+  if (moduleItem.title.includes("Simulated Exam")) {
+    const note = document.createElement("span");
+    note.className = "simulated-note";
+    note.textContent = " — Sleep well before the simulated exam";
+    title.append(note);
+  }
+  titleBlock.append(title);
+
+  const metaGroup = document.createElement("span");
+  metaGroup.className = "module-meta-group";
+
+  const statusPill = document.createElement("span");
+  statusPill.className = `status-pill ${statusClass} status-${statusClass}`;
+  statusPill.textContent = normalizeStatus(moduleItem.status) === "Completed" ? "Done" : normalizeStatus(moduleItem.status);
+
+  const dateSummary = document.createElement("span");
+  dateSummary.className = "module-summary-item";
+  dateSummary.textContent = moduleItem.plannedDate ? formatCompactDate(moduleItem.plannedDate) : "";
+
+  const editIndicator = document.createElement("span");
+  editIndicator.className = "edit-indicator";
+  editIndicator.textContent = isExpanded ? "Close" : "Edit";
+
+  summaryButton.append(titleBlock);
+
+  if (normalizeStatus(moduleItem.status) !== "Not Started") {
+    metaGroup.append(statusPill);
+  }
+
+  if (isExam) {
+    const enteredScore = getEnteredScore(moduleItem);
+
+    if (enteredScore !== null) {
+      const scoreSummary = document.createElement("span");
+      scoreSummary.className = `module-summary-item score-summary ${getScoreClass(moduleItem)}`;
+      scoreSummary.textContent = enteredScore;
+      metaGroup.append(scoreSummary);
+    }
+  }
+
+  if (moduleItem.plannedDate) {
+    metaGroup.append(dateSummary);
+  }
+
+  if (moduleItem.needsReview) {
+    const reviewSummary = document.createElement("span");
+    reviewSummary.className = "review-pill review-chip";
+    reviewSummary.textContent = "Review";
+    metaGroup.append(reviewSummary);
+  }
+
+  metaGroup.append(editIndicator);
+  summaryButton.append(metaGroup);
+  summaryButton.addEventListener("click", function () {
+    expandedModuleId = isExpanded ? null : moduleItem.id;
+    renderRoadmap();
+  });
+
+  const details = document.createElement("div");
+  details.id = `${moduleItem.id}-details`;
+  details.className = "module-details";
+  details.hidden = !isExpanded;
+
+  const controls = document.createElement("div");
+  controls.className = "roadmap-controls";
+
+  const statusLabel = document.createElement("label");
+  statusLabel.textContent = "Status";
+
+  const statusSelect = document.createElement("select");
+  statusSelect.setAttribute("aria-label", `Status for ${moduleItem.title}`);
+  STATUSES.forEach((status) => {
+    const option = document.createElement("option");
+    option.value = status;
+    option.textContent = formatStatus(status);
+    option.selected = moduleItem.status === status;
+    statusSelect.append(option);
+  });
+  statusSelect.addEventListener("change", function (event) {
+    updateModuleProgress(moduleItem.id, { status: event.target.value }, true);
+  });
+  statusLabel.append(statusSelect);
+
+  const reviewLabel = document.createElement("label");
+  reviewLabel.className = "checkbox-label roadmap-review";
+
+  const reviewCheckbox = document.createElement("input");
+  reviewCheckbox.type = "checkbox";
+  reviewCheckbox.checked = moduleItem.needsReview;
+  reviewCheckbox.addEventListener("change", function (event) {
+    updateModuleProgress(moduleItem.id, { needsReview: event.target.checked }, true);
+  });
+  reviewLabel.append(reviewCheckbox, "Needs Review");
+
+  const dateLabel = document.createElement("label");
+  dateLabel.textContent = "Planned";
+
+  const dateInput = document.createElement("input");
+  dateInput.type = "date";
+  dateInput.value = moduleItem.plannedDate || "";
+  dateInput.setAttribute("aria-label", `Planned date for ${moduleItem.title}`);
+  dateInput.addEventListener("change", function (event) {
+    updateModuleProgress(moduleItem.id, { plannedDate: event.target.value }, true);
+  });
+  dateLabel.append(dateInput);
+
+  controls.append(statusLabel);
+
+  if (isExam) {
+    const scoreLabel = document.createElement("label");
+    scoreLabel.textContent = "Score";
+
+    const scoreInput = document.createElement("input");
+    scoreInput.type = "number";
+    scoreInput.min = "0";
+    scoreInput.max = "100";
+    scoreInput.inputMode = "numeric";
+    scoreInput.placeholder = "0";
+    scoreInput.value = moduleItem.score;
+    scoreInput.setAttribute("aria-label", `Practice score for ${moduleItem.title}`);
+    scoreInput.addEventListener("change", function (event) {
+      updateModuleProgress(moduleItem.id, { score: event.target.value }, true);
+    });
+    scoreLabel.append(scoreInput);
+    controls.append(scoreLabel);
+  }
+
+  controls.append(dateLabel, reviewLabel);
+  details.append(controls);
+  row.append(summaryButton, details);
+  return row;
 }
 
 function resetCurrentSectionProgress() {
@@ -1414,6 +1494,12 @@ function createPlanDayElement(date, modules) {
     const item = document.createElement("li");
     const title = document.createElement("strong");
     title.textContent = moduleItem.title;
+    if (moduleItem.title.includes("Simulated Exam")) {
+      const note = document.createElement("span");
+      note.className = "simulated-note";
+      note.textContent = " — Sleep well before the simulated exam";
+      title.append(note);
+    }
 
     const reason = document.createElement("span");
     reason.textContent = `Reason: ${moduleItem.reasons.join(", ")}`;
@@ -1637,6 +1723,12 @@ function createCalendarModuleItem(moduleItem) {
 
   const title = document.createElement("strong");
   title.textContent = moduleItem.title;
+  if (moduleItem.title.includes("Simulated Exam")) {
+    const note = document.createElement("span");
+    note.className = "simulated-note";
+    note.textContent = " — Sleep well before the simulated exam";
+    title.append(note);
+  }
 
   const meta = document.createElement("span");
   meta.className = "calendar-module-meta";

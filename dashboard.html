@@ -88,10 +88,18 @@
             </article>
             <article class="dashboard-card preview-card">
               <div class="card-heading-row">
-                <h3>Calendar Preview</h3>
-                <button type="button" class="inline-view-button" data-view-target="calendar-plan">Open</button>
+                <h3>Current Section</h3>
+                <button type="button" class="inline-view-button" data-view-target="study-map">Open</button>
               </div>
-              <div id="calendar-preview-output" class="preview-list"></div>
+              <div class="section-pie-card">
+                <div id="current-section-pie" class="section-pie" role="img" aria-label="Current section progress">
+                  <span id="current-section-pie-percent">0%</span>
+                </div>
+                <div>
+                  <strong id="current-section-pie-title">REG progress</strong>
+                  <p id="current-section-pie-detail">0 / 11 modules completed</p>
+                </div>
+              </div>
             </article>
           </div>
         </section>
