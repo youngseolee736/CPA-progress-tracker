@@ -15,17 +15,34 @@
         </header>
 
         <form id="profile-form" class="setup-form">
-          <label for="exam-section">
-            Current Section
-            <select id="exam-section" required>
-              <option value="FAR">FAR</option>
-              <option value="AUD">AUD</option>
-              <option value="REG">REG</option>
-              <option value="TCP">TCP</option>
-              <option value="BAR">BAR</option>
-              <option value="ISC">ISC</option>
-            </select>
-          </label>
+          <section class="setup-group" aria-labelledby="core-sections-title">
+            <h2 id="core-sections-title">Core Sections</h2>
+            <div class="section-pill-row" aria-label="Core CPA sections">
+              <span class="section-label">FAR</span>
+              <span class="section-label">AUD</span>
+              <span class="section-label">REG</span>
+            </div>
+          </section>
+
+          <section class="setup-group" aria-labelledby="discipline-title">
+            <h2 id="discipline-title">Discipline Section</h2>
+            <label for="discipline-section">
+              Which Discipline section are you taking?
+              <select id="discipline-section" required>
+                <option value="TCP">TCP</option>
+                <option value="BAR">BAR</option>
+                <option value="ISC">ISC</option>
+              </select>
+            </label>
+          </section>
+
+          <section class="setup-group" aria-labelledby="study-setup-title">
+            <h2 id="study-setup-title">Current Study Setup</h2>
+            <label for="exam-section">
+              Current Section
+              <select id="exam-section" required></select>
+            </label>
+          </section>
 
           <div class="form-grid">
             <label for="exam-date">
@@ -46,32 +63,7 @@
 
           <fieldset>
             <legend>Passed Sections</legend>
-            <div class="checkbox-grid">
-              <label class="checkbox-label">
-                <input type="checkbox" name="passedSections" value="FAR" />
-                FAR
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" name="passedSections" value="AUD" />
-                AUD
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" name="passedSections" value="REG" />
-                REG
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" name="passedSections" value="TCP" />
-                TCP
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" name="passedSections" value="BAR" />
-                BAR
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" name="passedSections" value="ISC" />
-                ISC
-              </label>
-            </div>
+            <div id="passed-sections-list" class="passed-section-grid"></div>
           </fieldset>
 
           <button type="submit" class="primary-button">Create Dashboard</button>

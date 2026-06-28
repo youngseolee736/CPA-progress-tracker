@@ -3,6 +3,9 @@ const PROGRESS_KEY = "cpaRoadmapProgress";
 const LEGACY_TOPICS_KEY = "cpaProgressTopics";
 const STATUSES = ["Not Started", "In Progress", "Completed"];
 const DAY_IN_MS = 86400000;
+const REQUIRED_CPA_SECTIONS = 4;
+const CORE_SECTIONS = ["FAR", "AUD", "REG"];
+const DISCIPLINE_SECTIONS = ["TCP", "BAR", "ISC"];
 
 const cpaRoadmap = {
   FAR: [
@@ -81,34 +84,72 @@ let profile = loadProfile();
 let progress = loadProgress();
 let generatedStudyPlan = null;
 let expandedModuleId = null;
+let visibleCalendarDate = getDefaultCalendarDate();
 
 function loadProfile() {
   const savedProfile = localStorage.getItem(PROFILE_KEY);
 
   if (!savedProfile) {
-    return {
+    return normalizeProfile({
       currentSection: "REG",
+      selectedDiscipline: "TCP",
       passedSections: [],
       latestScore: "",
       targetScore: 75,
       examDate: "",
-    };
+    });
   }
 
   try {
-    return { targetScore: 75, passedSections: [], ...JSON.parse(savedProfile) };
+    return normalizeProfile({ targetScore: 75, passedSections: [], ...JSON.parse(savedProfile) });
   } catch {
-    return {
+    return normalizeProfile({
       currentSection: "REG",
+      selectedDiscipline: "TCP",
       passedSections: [],
       latestScore: "",
       targetScore: 75,
       examDate: "",
-    };
+    });
   }
 }
 
+function normalizeProfile(profileData) {
+  const selectedDiscipline = DISCIPLINE_SECTIONS.includes(profileData.selectedDiscipline)
+    ? profileData.selectedDiscipline
+    : DISCIPLINE_SECTIONS.includes(profileData.currentSection)
+      ? profileData.currentSection
+      : "TCP";
+  const normalizedProfile = {
+    ...profileData,
+    selectedDiscipline,
+    passedSections: normalizePassedSections(profileData.passedSections || []),
+  };
+  const requiredSections = getRequiredSections(normalizedProfile);
+  const currentSection = requiredSections.includes(profileData.currentSection) ? profileData.currentSection : selectedDiscipline || "REG";
+
+  return {
+    ...normalizedProfile,
+    currentSection,
+    passedSections: normalizedProfile.passedSections.filter((item) => requiredSections.includes(item.section)),
+  };
+}
+
+function normalizePassedSections(passedSections) {
+  return passedSections.map((item) => {
+    if (typeof item === "string") {
+      return { section: item, score: "" };
+    }
+
+    return {
+      section: item.section,
+      score: item.score === undefined || item.score === null ? "" : item.score,
+    };
+  });
+}
+
 function saveProfile() {
+  profile = normalizeProfile(profile);
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
 }
 
@@ -137,7 +178,39 @@ function getNumberValue(selector, fallback = 0) {
 }
 
 function getCurrentSection() {
-  return cpaRoadmap[profile.currentSection] ? profile.currentSection : "REG";
+  const requiredSections = getRequiredSections(profile);
+
+  return cpaRoadmap[profile.currentSection] && requiredSections.includes(profile.currentSection)
+    ? profile.currentSection
+    : profile.selectedDiscipline || "REG";
+}
+
+function getRequiredSections(profileData = profile) {
+  const discipline = DISCIPLINE_SECTIONS.includes(profileData.selectedDiscipline) ? profileData.selectedDiscipline : "TCP";
+  return [...CORE_SECTIONS, discipline];
+}
+
+function getPassedSectionScore(section) {
+  const passedSection = profile.passedSections.find((item) => item.section === section);
+  return passedSection ? passedSection.score : "";
+}
+
+function isSectionPassed(section) {
+  return profile.passedSections.some((item) => item.section === section);
+}
+
+function calculateOverallCpaProgress() {
+  const requiredSections = getRequiredSections(profile);
+  const passedCount = requiredSections.filter((section) => isSectionPassed(section)).length;
+  const percentage = Math.min(100, Math.round((passedCount / requiredSections.length) * 100));
+
+  return {
+    passedCount,
+    requiredCount: requiredSections.length,
+    totalRequired: requiredSections.length,
+    percent: percentage,
+    percentage,
+  };
 }
 
 function getModuleId(section, index) {
@@ -237,7 +310,6 @@ function updateModuleProgress(moduleId, updates, shouldRenderRoadmap = false) {
 
   if (shouldAutoPlan) {
     generatedStudyPlan = generateStudyPlan();
-    clearCalendarForCompletedPlan(generatedStudyPlan);
     applyStudyPlanDates(generatedStudyPlan);
     renderStudyPlan(generatedStudyPlan);
   }
@@ -346,25 +418,47 @@ function setupProfilePage() {
     return;
   }
 
-  document.querySelector("#exam-section").value = getCurrentSection();
+  document.querySelector("#discipline-section").value = profile.selectedDiscipline || "TCP";
   document.querySelector("#latest-score").value = profile.latestScore;
   document.querySelector("#target-score").value = profile.targetScore || 75;
   document.querySelector("#exam-date").value = profile.examDate || "";
+  renderCurrentSectionOptions();
+  renderPassedSectionInputs();
 
-  document.querySelectorAll('input[name="passedSections"]').forEach((checkbox) => {
-    checkbox.checked = profile.passedSections.includes(checkbox.value);
+  document.querySelector("#discipline-section").addEventListener("change", function (event) {
+    profile.selectedDiscipline = event.target.value;
+    profile.passedSections = profile.passedSections.filter((item) => getRequiredSections(profile).includes(item.section));
+
+    if (!getRequiredSections(profile).includes(profile.currentSection)) {
+      profile.currentSection = profile.selectedDiscipline;
+    }
+
+    renderCurrentSectionOptions();
+    renderPassedSectionInputs();
   });
 
   profileForm.addEventListener("submit", function (event) {
     event.preventDefault();
+    const selectedDiscipline = document.querySelector("#discipline-section").value;
+    const draftProfile = { ...profile, selectedDiscipline };
+    const requiredSections = getRequiredSections(draftProfile);
 
-    const passedSections = Array.from(document.querySelectorAll('input[name="passedSections"]:checked')).map(
-      (checkbox) => checkbox.value
-    );
+    const passedSections = Array.from(document.querySelectorAll('input[name="passedSections"]:checked')).map((checkbox) => {
+      const scoreInput = document.querySelector(`[data-section-score="${checkbox.value}"]`);
+      const scoreValue = scoreInput && scoreInput.value !== "" ? Number(scoreInput.value) : "";
+
+      return {
+        section: checkbox.value,
+        score: Number.isNaN(scoreValue) ? "" : scoreValue,
+      };
+    });
+
+    const currentSectionValue = document.querySelector("#exam-section").value;
 
     profile = {
-      currentSection: document.querySelector("#exam-section").value,
-      passedSections,
+      currentSection: requiredSections.includes(currentSectionValue) ? currentSectionValue : selectedDiscipline,
+      selectedDiscipline,
+      passedSections: passedSections.filter((item) => requiredSections.includes(item.section)),
       latestScore: getNumberValue("#latest-score"),
       targetScore: getNumberValue("#target-score", 75),
       examDate: document.querySelector("#exam-date").value,
@@ -375,6 +469,75 @@ function setupProfilePage() {
   });
 }
 
+function renderCurrentSectionOptions() {
+  const currentSectionSelect = document.querySelector("#exam-section");
+
+  if (!currentSectionSelect) {
+    return;
+  }
+
+  const requiredSections = getRequiredSections(profile);
+  const selectedValue = requiredSections.includes(profile.currentSection) ? profile.currentSection : profile.selectedDiscipline;
+  currentSectionSelect.innerHTML = "";
+
+  requiredSections.forEach((section) => {
+    const option = document.createElement("option");
+    option.value = section;
+    option.textContent = section;
+    option.selected = section === selectedValue;
+    currentSectionSelect.append(option);
+  });
+
+  profile.currentSection = selectedValue;
+}
+
+function renderPassedSectionInputs() {
+  const passedSectionsList = document.querySelector("#passed-sections-list");
+
+  if (!passedSectionsList) {
+    return;
+  }
+
+  passedSectionsList.innerHTML = "";
+
+  getRequiredSections(profile).forEach((section) => {
+    const row = document.createElement("div");
+    row.className = "passed-section-row";
+
+    const label = document.createElement("label");
+    label.className = "checkbox-label";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.name = "passedSections";
+    checkbox.value = section;
+    checkbox.checked = isSectionPassed(section);
+
+    label.append(checkbox, section);
+
+    const scoreInput = document.createElement("input");
+    scoreInput.className = "passed-score-input";
+    scoreInput.dataset.sectionScore = section;
+    scoreInput.type = "number";
+    scoreInput.min = "0";
+    scoreInput.max = "100";
+    scoreInput.placeholder = "Score";
+    scoreInput.disabled = !checkbox.checked;
+    scoreInput.value = getPassedSectionScore(section) || "";
+
+    checkbox.addEventListener("change", function () {
+      scoreInput.disabled = !checkbox.checked;
+
+      if (!checkbox.checked) {
+        scoreInput.value = "";
+      }
+    });
+
+    row.append(label, scoreInput);
+    passedSectionsList.append(row);
+  });
+}
+
 function setupDashboardPage() {
   const roadmapList = document.querySelector("#roadmap-list");
 
@@ -382,6 +545,9 @@ function setupDashboardPage() {
     return;
   }
 
+  document.querySelector("#header-profile-button").addEventListener("click", function () {
+    setActiveView("profile");
+  });
   document.querySelector("#study-map-tab").addEventListener("click", function () {
     setActiveView("study-map");
   });
@@ -392,6 +558,12 @@ function setupDashboardPage() {
     generateAndApplyStudyPlan();
   });
   document.querySelector("#apply-plan-button").addEventListener("click", applyGeneratedPlanToCalendar);
+  document.querySelector("#calendar-prev-button").addEventListener("click", function () {
+    changeCalendarMonth(-1);
+  });
+  document.querySelector("#calendar-next-button").addEventListener("click", function () {
+    changeCalendarMonth(1);
+  });
   document.querySelector("#reset-section-button").addEventListener("click", resetCurrentSectionProgress);
   document.querySelector("#reset-everything-button").addEventListener("click", resetEverything);
 
@@ -401,12 +573,21 @@ function setupDashboardPage() {
 }
 
 function setActiveView(viewName) {
-  const isStudyMap = viewName === "study-map";
+  const views = ["profile", "study-map", "calendar-plan"];
 
-  document.querySelector("#study-map-tab").classList.toggle("is-active", isStudyMap);
-  document.querySelector("#calendar-plan-tab").classList.toggle("is-active", !isStudyMap);
-  document.querySelector("#study-map-view").classList.toggle("is-active", isStudyMap);
-  document.querySelector("#calendar-plan-view").classList.toggle("is-active", !isStudyMap);
+  views.forEach((view) => {
+    const isActive = view === viewName;
+    const tab = document.querySelector(`#${view}-tab`);
+    const viewSection = document.querySelector(`#${view}-view`);
+
+    if (tab) {
+      tab.classList.toggle("is-active", isActive);
+    }
+
+    if (viewSection) {
+      viewSection.classList.toggle("is-active", isActive);
+    }
+  });
 }
 
 function renderDashboard() {
@@ -417,12 +598,225 @@ function renderDashboard() {
   document.querySelector("#section-eyebrow").textContent = `${section} current section study plan`;
   document.querySelector("#days-until-exam-output").textContent =
     daysUntilExam === null ? "No exam date set" : `${daysUntilExam} days until exam`;
-  document.querySelector("#overall-progress-output").textContent = `${stats.progressPercent}%`;
+  document.querySelector("#overall-progress-output").textContent = `${calculateOverallCpaProgress().percentage}%`;
   document.querySelector("#score-gap-output").textContent = `${calculateScoreGap()} points`;
   document.querySelector("#review-needed-output").textContent = stats.reviewCount;
   document.querySelector("#todays-focus-output").textContent = stats.nextPriority ? stats.nextPriority.title : "None yet";
   document.querySelector("#roadmap-section-label").textContent = section;
-  document.querySelector("#roadmap-subtitle").textContent = `${stats.completed} of ${stats.total} modules completed`;
+  document.querySelector("#roadmap-subtitle").textContent = isSectionPassed(section)
+    ? `${section} marked as passed`
+    : `${stats.completed} of ${stats.total} modules completed`;
+  renderProfileView();
+}
+
+function renderProfileView() {
+  const profileOutput = document.querySelector("#profile-view-output");
+
+  if (!profileOutput) {
+    return;
+  }
+
+  const section = getCurrentSection();
+  const stats = getRoadmapStats(section);
+  const overallProgress = calculateOverallCpaProgress();
+  const requiredSections = getRequiredSections(profile);
+  const daysUntilExam = calculateDaysUntilExam();
+  const scoreGap = calculateScoreGap();
+  const currentSectionProgressText = isSectionPassed(section)
+    ? "Passed · 100% complete"
+    : `${section}: ${stats.completed} / ${stats.total} modules completed · ${stats.progressPercent}%`;
+
+  document.querySelector("#profile-current-section-pill").textContent = section;
+  profileOutput.innerHTML = "";
+
+  const profileItems = [
+    ["Current Section", section],
+    ["Selected Discipline", profile.selectedDiscipline],
+    ["Target Exam Date", profile.examDate ? formatDisplayDate(profile.examDate) : "No date set"],
+    ["Days Until Exam", daysUntilExam === null ? "No date set" : daysUntilExam],
+    ["Latest Practice Score", profile.latestScore === "" ? "Not entered" : profile.latestScore],
+    ["Target Score", profile.targetScore || 75],
+    ["Score Gap", `${scoreGap} pts`],
+  ];
+
+  const summaryGrid = document.createElement("div");
+  summaryGrid.className = "profile-summary";
+
+  profileItems.forEach(([label, value]) => {
+    const item = document.createElement("div");
+    item.className = "profile-item";
+
+    const labelElement = document.createElement("span");
+    labelElement.textContent = label;
+
+    const valueElement = document.createElement("strong");
+    valueElement.textContent = value;
+
+    item.append(labelElement, valueElement);
+    summaryGrid.append(item);
+  });
+
+  const progressBlock = document.createElement("div");
+  progressBlock.className = "profile-progress-block";
+  progressBlock.append(
+    createProfileTextSection(
+      "Overall CPA Progress",
+      `${overallProgress.passedCount} / ${overallProgress.totalRequired} sections passed · ${overallProgress.percent}% complete`
+    ),
+    createProfileTextSection("Current Section Progress", currentSectionProgressText)
+  );
+
+  const requiredBlock = createProfilePillSection(
+    "Required Sections",
+    requiredSections.map((requiredSection) => ({
+      text: requiredSection,
+      className: requiredSection === section ? "section-label profile-required-pill is-current" : "section-label profile-required-pill",
+    }))
+  );
+
+  const requiredPassedSections = requiredSections
+    .filter((requiredSection) => isSectionPassed(requiredSection))
+    .map((requiredSection) => ({
+      section: requiredSection,
+      score: getPassedSectionScore(requiredSection),
+    }));
+
+  const passedBlock = document.createElement("section");
+  passedBlock.className = "profile-detail-section";
+  const passedHeading = document.createElement("h3");
+  passedHeading.textContent = "Passed Sections";
+  const passedList = document.createElement("div");
+  passedList.className = "passed-pill-list";
+
+  if (requiredPassedSections.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-message";
+    empty.textContent = "No sections marked as passed yet.";
+    passedList.append(empty);
+  } else {
+    requiredPassedSections.forEach((item) => {
+      const pill = document.createElement("span");
+      pill.className = "passed-pill";
+      pill.textContent = item.score === "" ? item.section : `${item.section} — ${item.score}`;
+      passedList.append(pill);
+    });
+  }
+
+  passedBlock.append(passedHeading, passedList);
+
+  const sectionStatusBlock = document.createElement("section");
+  sectionStatusBlock.className = "profile-detail-section";
+  const statusHeading = document.createElement("h3");
+  statusHeading.textContent = "Section Status";
+  const statusList = document.createElement("div");
+  statusList.className = "section-status-list";
+
+  requiredSections.forEach((requiredSection) => {
+    statusList.append(createSectionStatusRow(requiredSection));
+  });
+
+  sectionStatusBlock.append(statusHeading, statusList);
+  profileOutput.append(summaryGrid, progressBlock, requiredBlock, passedBlock, sectionStatusBlock);
+}
+
+function createProfileTextSection(title, text) {
+  const section = document.createElement("section");
+  section.className = "profile-detail-section";
+
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+
+  const value = document.createElement("strong");
+  value.className = "profile-progress-value";
+  value.textContent = text;
+
+  section.append(heading, value);
+  return section;
+}
+
+function createProfilePillSection(title, pills) {
+  const section = document.createElement("section");
+  section.className = "profile-detail-section";
+
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+
+  const list = document.createElement("div");
+  list.className = "profile-pill-list";
+
+  pills.forEach((pillData) => {
+    const pill = document.createElement("span");
+    pill.className = pillData.className;
+    pill.textContent = pillData.text;
+    list.append(pill);
+  });
+
+  section.append(heading, list);
+  return section;
+}
+
+function createSectionStatusRow(section) {
+  const row = document.createElement("div");
+  row.className = "section-status-row";
+
+  const title = document.createElement("strong");
+  title.textContent = section;
+
+  const detail = document.createElement("span");
+  const badge = document.createElement("span");
+
+  if (isSectionPassed(section)) {
+    const score = getPassedSectionScore(section);
+    badge.className = "profile-status-badge is-passed";
+    badge.textContent = "Passed";
+    detail.textContent = score === "" ? "100%" : `${score} · 100%`;
+  } else if (section === getCurrentSection()) {
+    const stats = getRoadmapStats(section);
+    badge.className = "profile-status-badge is-current";
+    badge.textContent = "Current";
+    detail.textContent = `${stats.completed} / ${stats.total} modules · ${stats.progressPercent}%`;
+  } else {
+    badge.className = "profile-status-badge is-not-started";
+    badge.textContent = "Not Started";
+    detail.textContent = "";
+  }
+
+  const meta = document.createElement("div");
+  meta.className = "section-status-meta";
+  meta.append(badge);
+
+  if (detail.textContent) {
+    meta.append(detail);
+  }
+
+  const editButton = document.createElement("button");
+  editButton.type = "button";
+  editButton.className = "section-edit-button";
+  editButton.textContent = "Edit";
+  editButton.addEventListener("click", function () {
+    editProfileSection(section);
+  });
+
+  const actions = document.createElement("div");
+  actions.className = "section-status-actions";
+  actions.append(meta, editButton);
+
+  row.append(title, actions);
+  return row;
+}
+
+function editProfileSection(section) {
+  if (!getRequiredSections(profile).includes(section)) {
+    return;
+  }
+
+  profile.currentSection = section;
+  expandedModuleId = null;
+  saveProfile();
+  renderDashboard();
+  renderCalendarView();
+  renderRoadmap();
+  setActiveView("study-map");
 }
 
 function renderRoadmap() {
@@ -434,6 +828,7 @@ function renderRoadmap() {
 
   modules.forEach((moduleItem) => {
     const isExpanded = expandedModuleId === moduleItem.id;
+    const isExam = isExamModule(moduleItem.title);
     const statusClass = getSimpleStatusClass(moduleItem.status);
     const row = document.createElement("article");
     row.className = `module-row roadmap-row ${statusClass} status-${statusClass}${isExpanded ? " is-expanded" : ""}`;
@@ -455,10 +850,6 @@ function renderRoadmap() {
     statusPill.className = `status-pill ${statusClass} status-${statusClass}`;
     statusPill.textContent = normalizeStatus(moduleItem.status) === "Completed" ? "✓ Completed" : normalizeStatus(moduleItem.status);
 
-    const scoreSummary = document.createElement("span");
-    scoreSummary.className = `module-summary-item score-summary ${getScoreClass(moduleItem)}`;
-    scoreSummary.textContent = getEnteredScore(moduleItem) === null ? "No score" : `Score: ${getEnteredScore(moduleItem)}`;
-
     const dateSummary = document.createElement("span");
     dateSummary.className = "module-summary-item";
     dateSummary.textContent = formatCompactDate(moduleItem.plannedDate);
@@ -467,7 +858,16 @@ function renderRoadmap() {
     editIndicator.className = "edit-indicator";
     editIndicator.textContent = isExpanded ? "Close" : "Edit";
 
-    summaryButton.append(titleBlock, statusPill, scoreSummary, dateSummary);
+    summaryButton.append(titleBlock, statusPill);
+
+    if (isExam) {
+      const scoreSummary = document.createElement("span");
+      scoreSummary.className = `module-summary-item score-summary ${getScoreClass(moduleItem)}`;
+      scoreSummary.textContent = getEnteredScore(moduleItem) === null ? "No score" : `Score: ${getEnteredScore(moduleItem)}`;
+      summaryButton.append(scoreSummary);
+    }
+
+    summaryButton.append(dateSummary);
 
     if (moduleItem.needsReview) {
       const reviewSummary = document.createElement("span");
@@ -507,22 +907,6 @@ function renderRoadmap() {
     });
     statusLabel.append(statusSelect);
 
-    const scoreLabel = document.createElement("label");
-    scoreLabel.textContent = "Score";
-
-    const scoreInput = document.createElement("input");
-    scoreInput.type = "number";
-    scoreInput.min = "0";
-    scoreInput.max = "100";
-    scoreInput.inputMode = "numeric";
-    scoreInput.placeholder = "0";
-    scoreInput.value = moduleItem.score;
-    scoreInput.setAttribute("aria-label", `Practice score for ${moduleItem.title}`);
-    scoreInput.addEventListener("change", function (event) {
-      updateModuleProgress(moduleItem.id, { score: event.target.value }, true);
-    });
-    scoreLabel.append(scoreInput);
-
     const reviewLabel = document.createElement("label");
     reviewLabel.className = "checkbox-label roadmap-review";
 
@@ -546,7 +930,28 @@ function renderRoadmap() {
     });
     dateLabel.append(dateInput);
 
-    controls.append(statusLabel, scoreLabel, dateLabel, reviewLabel);
+    controls.append(statusLabel);
+
+    if (isExam) {
+      const scoreLabel = document.createElement("label");
+      scoreLabel.textContent = "Score";
+
+      const scoreInput = document.createElement("input");
+      scoreInput.type = "number";
+      scoreInput.min = "0";
+      scoreInput.max = "100";
+      scoreInput.inputMode = "numeric";
+      scoreInput.placeholder = "0";
+      scoreInput.value = moduleItem.score;
+      scoreInput.setAttribute("aria-label", `Practice score for ${moduleItem.title}`);
+      scoreInput.addEventListener("change", function (event) {
+        updateModuleProgress(moduleItem.id, { score: event.target.value }, true);
+      });
+      scoreLabel.append(scoreInput);
+      controls.append(scoreLabel);
+    }
+
+    controls.append(dateLabel, reviewLabel);
     details.append(controls);
     row.append(summaryButton, details);
     roadmapList.append(row);
@@ -587,6 +992,26 @@ function parseLocalDate(dateString) {
   return new Date(`${dateString}T00:00:00`);
 }
 
+function getExamDate() {
+  return parseLocalDate(profile.examDate);
+}
+
+function getDefaultCalendarDate() {
+  return getExamDate() || getToday();
+}
+
+function getFinalReviewDate() {
+  const examDate = getExamDate();
+
+  if (!examDate) {
+    return null;
+  }
+
+  const finalReviewDate = addDays(examDate, -1);
+
+  return finalReviewDate > getToday() ? finalReviewDate : null;
+}
+
 function addDays(date, days) {
   const nextDate = new Date(date);
   nextDate.setDate(nextDate.getDate() + days);
@@ -600,6 +1025,34 @@ function formatIsoDate(date) {
   return `${year}-${month}-${day}`;
 }
 
+function formatCalendarDateKey(date) {
+  return formatIsoDate(date);
+}
+
+function isSameDate(dateA, dateB) {
+  if (!dateA || !dateB) {
+    return false;
+  }
+
+  return (
+    dateA.getFullYear() === dateB.getFullYear() &&
+    dateA.getMonth() === dateB.getMonth() &&
+    dateA.getDate() === dateB.getDate()
+  );
+}
+
+function getCalendarMonthDates(year, month) {
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const dates = Array.from({ length: firstDay.getDay() }, () => null);
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    dates.push(new Date(year, month, day));
+  }
+
+  return dates;
+}
+
 function formatDisplayDate(dateString) {
   const date = parseLocalDate(dateString);
 
@@ -607,7 +1060,7 @@ function formatDisplayDate(dateString) {
     return "";
   }
 
-  return date.toLocaleDateString(undefined, { month: "long", day: "numeric" });
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function formatCompactDate(dateString) {
@@ -621,13 +1074,17 @@ function formatCompactDate(dateString) {
 }
 
 function isCompletedEnough(moduleItem) {
-  const score = getEnteredScore(moduleItem);
+  if (!isExamModule(moduleItem.title)) {
+    return normalizeStatus(moduleItem.status) === "Completed" && !moduleItem.needsReview;
+  }
 
+  const score = getEnteredScore(moduleItem);
   return normalizeStatus(moduleItem.status) === "Completed" && score !== null && score >= 75 && !moduleItem.needsReview;
 }
 
 function getStudyPlanReasons(moduleItem) {
-  const score = getEnteredScore(moduleItem);
+  const isExam = isExamModule(moduleItem.title);
+  const score = isExam ? getEnteredScore(moduleItem) : null;
   const reasons = [];
 
   if (moduleItem.needsReview) {
@@ -646,15 +1103,15 @@ function getStudyPlanReasons(moduleItem) {
     reasons.push("In progress");
   }
 
-  if (moduleItem.title.includes("Mini Exam")) {
+  if (isExam && moduleItem.title.includes("Mini Exam")) {
     reasons.push("Mini exam checkpoint");
   }
 
-  if (moduleItem.title.includes("Simulated Exam")) {
+  if (isExam && moduleItem.title.includes("Simulated Exam")) {
     reasons.push("Simulated exam practice");
   }
 
-  if (reasons.length === 0 && score === null) {
+  if (isExam && reasons.length === 0 && score === null) {
     reasons.push("No score entered");
   }
 
@@ -662,16 +1119,17 @@ function getStudyPlanReasons(moduleItem) {
 }
 
 function getStudyPlanPriority(moduleItem) {
-  const score = getEnteredScore(moduleItem);
+  const isExam = isExamModule(moduleItem.title);
+  const score = isExam ? getEnteredScore(moduleItem) : null;
   let priority = 0;
 
   if (moduleItem.needsReview) {
     priority += 5;
   }
 
-  if (score !== null && score < 65) {
+  if (isExam && score !== null && score < 65) {
     priority += 4;
-  } else if (score !== null && score >= 65 && score <= 74) {
+  } else if (isExam && score !== null && score >= 65 && score <= 74) {
     priority += 3;
   }
 
@@ -683,15 +1141,11 @@ function getStudyPlanPriority(moduleItem) {
     priority += 2;
   }
 
-  if (score === null) {
-    priority += 1;
-  }
-
-  if (moduleItem.title.includes("Mini Exam")) {
+  if (isExam && moduleItem.title.includes("Mini Exam")) {
     priority += 2;
   }
 
-  if (moduleItem.title.includes("Simulated Exam")) {
+  if (isExam && moduleItem.title.includes("Simulated Exam")) {
     priority += 3;
   }
 
@@ -721,7 +1175,7 @@ function generateStudyPlan() {
   const modulesNeedingWork = modules
     .filter((moduleItem) => !isCompletedEnough(moduleItem))
     .filter((moduleItem) => {
-      const score = getEnteredScore(moduleItem);
+      const score = isExamModule(moduleItem.title) ? getEnteredScore(moduleItem) : null;
       const status = normalizeStatus(moduleItem.status);
 
       return status === "Not Started" || status === "In Progress" || moduleItem.needsReview || (score !== null && score < 75);
@@ -737,21 +1191,23 @@ function generateStudyPlan() {
     return { type: "message", message: "You are on track. Use remaining time for final review." };
   }
 
-  const reservedReviewDays = daysUntilExam >= 7 ? 2 : daysUntilExam >= 3 ? 1 : 0;
-  const studyDayCount = Math.max(1, daysUntilExam - reservedReviewDays);
-  const planDays = Array.from({ length: studyDayCount }, (_, index) => ({
-    date: formatIsoDate(addDays(today, index)),
+  const schedulableDates = Array.from({ length: Math.max(0, daysUntilExam - 1) }, (_, index) =>
+    formatIsoDate(addDays(today, index + 1))
+  );
+  const reviewDays = schedulableDates.length >= 2 ? [schedulableDates[schedulableDates.length - 1]] : [];
+  const moduleDates = reviewDays.length > 0 ? schedulableDates.slice(0, -1) : schedulableDates;
+  const planDates = moduleDates.length > 0 ? moduleDates : [formatIsoDate(addDays(today, 1))];
+  const planDays = planDates.map((date) => ({
+    date,
     modules: [],
   }));
 
-  modulesNeedingWork.forEach((moduleItem, index) => {
-    const dayIndex = Math.min(index, studyDayCount - 1);
+  const unscheduledWork = modulesNeedingWork.filter((moduleItem) => !moduleItem.plannedDate);
+
+  unscheduledWork.forEach((moduleItem, index) => {
+    const dayIndex = Math.min(index, planDays.length - 1);
     planDays[dayIndex].modules.push(moduleItem);
   });
-
-  const reviewDays = Array.from({ length: reservedReviewDays }, (_, index) =>
-    formatIsoDate(addDays(today, studyDayCount + index))
-  );
 
   return {
     type: "plan",
@@ -793,6 +1249,11 @@ function renderStudyPlan(plan) {
     return;
   }
 
+  const successMessage = document.createElement("p");
+  successMessage.className = "success-message";
+  successMessage.textContent = "Study plan generated and added to Calendar View.";
+  planOutput.append(successMessage);
+
   plan.planDays.forEach((day) => {
     if (day.modules.length > 0) {
       planOutput.append(createPlanDayElement(day.date, day.modules));
@@ -820,13 +1281,14 @@ function renderStudyPlan(plan) {
 
 function generateAndApplyStudyPlan() {
   generatedStudyPlan = generateStudyPlan();
-  clearCalendarForCompletedPlan(generatedStudyPlan);
   applyStudyPlanDates(generatedStudyPlan);
   saveProgress();
+  visibleCalendarDate = getDefaultCalendarDate();
   renderStudyPlan(generatedStudyPlan);
   renderDashboard();
   renderCalendarView();
   renderRoadmap();
+  setActiveView("calendar-plan");
 }
 
 function createPlanDayElement(date, modules) {
@@ -853,23 +1315,6 @@ function createPlanDayElement(date, modules) {
   return dayGroup;
 }
 
-function clearSectionPlannedDates() {
-  const section = getCurrentSection();
-
-  getSectionProgress(section).forEach((moduleItem) => {
-    progress[section][moduleItem.id] = {
-      ...progress[section][moduleItem.id],
-      plannedDate: "",
-    };
-  });
-}
-
-function clearCalendarForCompletedPlan(plan) {
-  if (plan && plan.type === "message" && plan.message === "You are on track. Use remaining time for final review.") {
-    clearSectionPlannedDates();
-  }
-}
-
 function applyStudyPlanDates(plan) {
   if (!plan || plan.type !== "plan") {
     return;
@@ -877,10 +1322,12 @@ function applyStudyPlanDates(plan) {
 
   const section = getCurrentSection();
 
-  clearSectionPlannedDates();
-
   plan.planDays.forEach((day) => {
     day.modules.forEach((moduleItem) => {
+      if (progress[section][moduleItem.id] && progress[section][moduleItem.id].plannedDate) {
+        return;
+      }
+
       progress[section][moduleItem.id] = {
         ...progress[section][moduleItem.id],
         plannedDate: day.date,
@@ -895,60 +1342,153 @@ function applyGeneratedPlanToCalendar() {
     renderStudyPlan(generatedStudyPlan);
   }
 
-  clearCalendarForCompletedPlan(generatedStudyPlan);
   applyStudyPlanDates(generatedStudyPlan);
 
   saveProgress();
+  visibleCalendarDate = getDefaultCalendarDate();
   renderDashboard();
   renderCalendarView();
   renderRoadmap();
+  setActiveView("calendar-plan");
 }
 
 function renderCalendarView() {
-  const calendarOutput = document.querySelector("#calendar-output");
+  renderCalendarGrid();
+}
 
-  if (!calendarOutput) {
+function changeCalendarMonth(offset) {
+  visibleCalendarDate = new Date(visibleCalendarDate.getFullYear(), visibleCalendarDate.getMonth() + offset, 1);
+  renderCalendarView();
+}
+
+function groupModulesByDate(modules = getSectionProgress(getCurrentSection())) {
+  return modules
+    .filter((moduleItem) => moduleItem.plannedDate)
+    .reduce((groups, moduleItem) => {
+      if (!groups[moduleItem.plannedDate]) {
+        groups[moduleItem.plannedDate] = [];
+      }
+
+      groups[moduleItem.plannedDate].push({
+        ...moduleItem,
+        reasons: getStudyPlanReasons(moduleItem),
+      });
+
+      return groups;
+    }, {});
+}
+
+function renderCalendarGrid() {
+  const calendarOutput = document.querySelector("#calendar-output");
+  const calendarGrid = document.querySelector("#calendar-grid");
+  const monthLabel = document.querySelector("#calendar-month-label");
+  const unscheduledOutput = document.querySelector("#calendar-unscheduled-output");
+
+  if (!calendarOutput || !calendarGrid || !monthLabel || !unscheduledOutput) {
     return;
   }
 
   const section = getCurrentSection();
   const modules = getSectionProgress(section);
-  const plannedModules = modules
-    .filter((moduleItem) => moduleItem.plannedDate)
-    .sort((a, b) => a.plannedDate.localeCompare(b.plannedDate));
-  const unscheduledModules = modules.filter((moduleItem) => !moduleItem.plannedDate);
+  const plannedModules = modules.filter((moduleItem) => moduleItem.plannedDate);
+  const unscheduledModules = modules.filter(
+    (moduleItem) => !moduleItem.plannedDate && (normalizeStatus(moduleItem.status) !== "Completed" || moduleItem.needsReview)
+  );
+  const modulesByDate = groupModulesByDate(modules);
+  const year = visibleCalendarDate.getFullYear();
+  const month = visibleCalendarDate.getMonth();
+  const monthDates = getCalendarMonthDates(year, month);
+  const examDate = getExamDate();
+  const finalReviewDate = getFinalReviewDate();
 
-  calendarOutput.innerHTML = "";
+  monthLabel.textContent = visibleCalendarDate.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  calendarGrid.innerHTML = "";
+  unscheduledOutput.innerHTML = "";
 
   if (modules.length === 0) {
     const emptyState = document.createElement("p");
     emptyState.className = "empty-message";
     emptyState.textContent = "No modules loaded for this section.";
-    calendarOutput.append(emptyState);
+    unscheduledOutput.append(emptyState);
     return;
   }
 
-  const modulesByDate = plannedModules.reduce((groups, moduleItem) => {
-    if (!groups[moduleItem.plannedDate]) {
-      groups[moduleItem.plannedDate] = [];
-    }
-
-    groups[moduleItem.plannedDate].push({
-      ...moduleItem,
-      reasons: getStudyPlanReasons(moduleItem),
-    });
-
-    return groups;
-  }, {});
-
-  Object.keys(modulesByDate).forEach((date) => {
-    calendarOutput.append(createPlanDayElement(date, modulesByDate[date]));
+  ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].forEach((weekday) => {
+    const weekdayCell = document.createElement("div");
+    weekdayCell.className = "calendar-weekday";
+    weekdayCell.textContent = weekday;
+    calendarGrid.append(weekdayCell);
   });
 
+  monthDates.forEach((date) => {
+    const cell = document.createElement("div");
+    cell.className = "calendar-cell";
+
+    if (!date) {
+      cell.classList.add("is-empty");
+      calendarGrid.append(cell);
+      return;
+    }
+
+    if (isSameDate(date, examDate)) {
+      cell.classList.add("is-exam-day");
+    }
+
+    if (isSameDate(date, getToday())) {
+      cell.classList.add("is-today");
+    }
+
+    if (isSameDate(date, finalReviewDate)) {
+      cell.classList.add("is-final-review");
+    }
+
+    const dayNumber = document.createElement("span");
+    dayNumber.className = "calendar-day-number";
+    dayNumber.textContent = date.getDate();
+    cell.append(dayNumber);
+
+    if (isSameDate(date, examDate)) {
+      const examMarker = document.createElement("span");
+      examMarker.className = "calendar-marker exam-marker";
+      examMarker.textContent = "Exam Day";
+      cell.append(examMarker);
+    }
+
+    if (isSameDate(date, finalReviewDate)) {
+      const reviewMarker = document.createElement("span");
+      reviewMarker.className = "calendar-marker review-marker";
+      reviewMarker.textContent = "Final Review";
+      cell.append(reviewMarker);
+    }
+
+    const dateKey = formatCalendarDateKey(date);
+    const dayModules = modulesByDate[dateKey] || [];
+
+    if (dayModules.length > 0) {
+      const moduleList = document.createElement("div");
+      moduleList.className = "calendar-cell-modules";
+
+      dayModules.forEach((moduleItem) => {
+        moduleList.append(createCalendarModuleItem(moduleItem));
+      });
+
+      cell.append(moduleList);
+    }
+
+    calendarGrid.append(cell);
+  });
+
+  if (plannedModules.length === 0) {
+    const emptyState = document.createElement("p");
+    emptyState.className = "empty-message";
+    emptyState.textContent = "No study plan yet. Click Generate Study Plan to create one.";
+    unscheduledOutput.append(emptyState);
+  }
+
   if (unscheduledModules.length > 0) {
-    calendarOutput.append(
+    unscheduledOutput.append(
       createCalendarGroupElement(
-        "Unscheduled",
+        "Unscheduled Modules",
         unscheduledModules.map((moduleItem) => ({
           ...moduleItem,
           reasons: getStudyPlanReasons(moduleItem),
@@ -965,21 +1505,52 @@ function createCalendarGroupElement(titleText, modules) {
   const heading = document.createElement("h4");
   heading.textContent = titleText;
 
-  const list = document.createElement("ul");
+  const list = document.createElement("div");
+  list.className = "calendar-module-list";
   modules.forEach((moduleItem) => {
-    const item = document.createElement("li");
-    const title = document.createElement("strong");
-    title.textContent = moduleItem.title;
-
-    const detail = document.createElement("span");
-    detail.textContent = `Status: ${normalizeStatus(moduleItem.status)}`;
-
-    item.append(title, detail);
-    list.append(item);
+    list.append(createCalendarModuleItem(moduleItem));
   });
 
   group.append(heading, list);
   return group;
+}
+
+function createCalendarDateElement(date, modules) {
+  return createCalendarGroupElement(formatDisplayDate(date), modules);
+}
+
+function createCalendarModuleItem(moduleItem) {
+  const item = document.createElement("div");
+  const statusClass = getSimpleStatusClass(moduleItem.status);
+  item.className = `calendar-module-item ${statusClass} status-${statusClass}`;
+
+  const title = document.createElement("strong");
+  title.textContent = moduleItem.title;
+
+  const meta = document.createElement("span");
+  meta.className = "calendar-module-meta";
+
+  const statusPill = document.createElement("span");
+  statusPill.className = `status-pill ${statusClass} status-${statusClass}`;
+  statusPill.textContent = normalizeStatus(moduleItem.status) === "Completed" ? "✓ Completed" : normalizeStatus(moduleItem.status);
+  meta.append(statusPill);
+
+  if (moduleItem.needsReview) {
+    const reviewPill = document.createElement("span");
+    reviewPill.className = "review-pill";
+    reviewPill.textContent = "Review";
+    meta.append(reviewPill);
+  }
+
+  if (isExamModule(moduleItem.title)) {
+    const score = document.createElement("span");
+    score.className = `score-summary ${getScoreClass(moduleItem)}`;
+    score.textContent = getEnteredScore(moduleItem) === null ? "No score" : `Score: ${getEnteredScore(moduleItem)}`;
+    meta.append(score);
+  }
+
+  item.append(title, meta);
+  return item;
 }
 
 setupProfilePage();
