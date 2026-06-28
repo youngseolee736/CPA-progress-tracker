@@ -43,4 +43,3 @@ Repository link:https://youngseolee736.github.io/CPA-progress-tracker/
 
 ## What I Learned
 
-_Add notes about what you learned while building this project._

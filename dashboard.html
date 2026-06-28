@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CPA Dashboard</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="page-header page-header-row">
+        <div>
+          <h1>CPA Dashboard</h1>
+          <p>Track your selected CPA section roadmap, scores, and review priorities.</p>
+        </div>
+        <a class="text-button" href="index.html">Edit Setup</a>
+      </header>
+
+      <section class="section" aria-labelledby="overview-title">
+        <h2 id="overview-title">Exam Overview</h2>
+
+        <dl class="summary-list">
+          <div>
+            <dt>Current Section</dt>
+            <dd id="current-section-output">Not set</dd>
+          </div>
+          <div>
+            <dt>Passed Sections</dt>
+            <dd id="passed-sections-output">None yet</dd>
+          </div>
+          <div>
+            <dt>Latest Practice Score</dt>
+            <dd id="latest-score-output">0</dd>
+          </div>
+          <div>
+            <dt>Target Score</dt>
+            <dd id="target-score-output">75</dd>
+          </div>
+          <div>
+            <dt>Score Gap</dt>
+            <dd id="score-gap-output">0 points</dd>
+          </div>
+          <div>
+            <dt>Days Until Exam</dt>
+            <dd id="days-until-exam-output">No date set</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="section" aria-labelledby="progress-title">
+        <h2 id="progress-title">Topic Progress</h2>
+
+        <dl class="summary-list">
+          <div>
+            <dt>Overall Progress</dt>
+            <dd id="overall-progress-output">0%</dd>
+          </div>
+          <div>
+            <dt>Completed Modules</dt>
+            <dd id="completed-modules-output">0 / 0</dd>
+          </div>
+          <div>
+            <dt>Average Module Score</dt>
+            <dd id="average-score-output">No scores yet</dd>
+          </div>
+          <div>
+            <dt>Needs Review</dt>
+            <dd id="review-needed-output">0</dd>
+          </div>
+          <div>
+            <dt>Weakest Module</dt>
+            <dd id="weakest-module-output">None yet</dd>
+          </div>
+          <div>
+            <dt>Next Priority</dt>
+            <dd id="next-priority-output">None yet</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="section" aria-labelledby="roadmap-title">
+        <div class="section-heading-row">
+          <h2 id="roadmap-title">Section Roadmap</h2>
+          <span id="roadmap-section-label" class="section-label">REG</span>
+        </div>
+
+        <div class="button-row plan-actions">
+          <button type="button" id="generate-plan-button" class="primary-button">Generate Study Plan</button>
+          <button type="button" id="apply-plan-button" class="secondary-button">Apply Plan to Calendar</button>
+        </div>
+
+        <section class="study-plan-panel" aria-labelledby="study-plan-title">
+          <h3 id="study-plan-title">Suggested Study Plan</h3>
+          <div id="study-plan-output" class="plan-output" aria-live="polite">
+            <p class="empty-message">Click "Generate Study Plan" to create a plan from your current progress.</p>
+          </div>
+        </section>
+
+        <section class="study-plan-panel" aria-labelledby="calendar-title">
+          <h3 id="calendar-title">Calendar View</h3>
+          <div id="calendar-output" class="plan-output" aria-live="polite">
+            <p class="empty-message">No planned module dates yet.</p>
+          </div>
+        </section>
+
+        <div id="roadmap-list" class="roadmap-list" aria-live="polite"></div>
+      </section>
+
+      <section class="section reset-section" aria-labelledby="controls-title">
+        <h2 id="controls-title">Controls</h2>
+        <div class="button-row">
+          <button type="button" id="reset-section-button" class="secondary-button">Reset Current Section Progress</button>
+          <button type="button" id="reset-everything-button" class="secondary-button">Reset Everything</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
