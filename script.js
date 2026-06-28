@@ -545,7 +545,10 @@ function setupDashboardPage() {
     return;
   }
 
-  document.querySelector("#header-profile-button").addEventListener("click", function () {
+  document.querySelector("#dashboard-tab").addEventListener("click", function () {
+    setActiveView("dashboard");
+  });
+  document.querySelector("#profile-tab").addEventListener("click", function () {
     setActiveView("profile");
   });
   document.querySelector("#study-map-tab").addEventListener("click", function () {
@@ -553,6 +556,14 @@ function setupDashboardPage() {
   });
   document.querySelector("#calendar-plan-tab").addEventListener("click", function () {
     setActiveView("calendar-plan");
+  });
+  document.querySelector("#settings-tab").addEventListener("click", function () {
+    setActiveView("settings");
+  });
+  document.querySelectorAll("[data-view-target]").forEach((button) => {
+    button.addEventListener("click", function () {
+      setActiveView(button.dataset.viewTarget);
+    });
   });
   document.querySelector("#generate-plan-button").addEventListener("click", function () {
     generateAndApplyStudyPlan();
@@ -573,7 +584,7 @@ function setupDashboardPage() {
 }
 
 function setActiveView(viewName) {
-  const views = ["profile", "study-map", "calendar-plan"];
+  const views = ["dashboard", "profile", "study-map", "calendar-plan", "settings"];
 
   views.forEach((view) => {
     const isActive = view === viewName;
@@ -582,6 +593,7 @@ function setActiveView(viewName) {
 
     if (tab) {
       tab.classList.toggle("is-active", isActive);
+      tab.setAttribute("aria-current", isActive ? "page" : "false");
     }
 
     if (viewSection) {
@@ -594,11 +606,12 @@ function renderDashboard() {
   const section = getCurrentSection();
   const daysUntilExam = calculateDaysUntilExam();
   const stats = getRoadmapStats(section);
+  const overallProgress = calculateOverallCpaProgress();
 
   document.querySelector("#section-eyebrow").textContent = `${section} current section study plan`;
   document.querySelector("#days-until-exam-output").textContent =
     daysUntilExam === null ? "No exam date set" : `${daysUntilExam} days until exam`;
-  document.querySelector("#overall-progress-output").textContent = `${calculateOverallCpaProgress().percentage}%`;
+  document.querySelector("#overall-progress-output").textContent = `${overallProgress.percentage}%`;
   document.querySelector("#score-gap-output").textContent = `${calculateScoreGap()} points`;
   document.querySelector("#review-needed-output").textContent = stats.reviewCount;
   document.querySelector("#todays-focus-output").textContent = stats.nextPriority ? stats.nextPriority.title : "None yet";
@@ -606,7 +619,105 @@ function renderDashboard() {
   document.querySelector("#roadmap-subtitle").textContent = isSectionPassed(section)
     ? `${section} marked as passed`
     : `${stats.completed} of ${stats.total} modules completed`;
+  renderSidebarSummary(section, daysUntilExam, overallProgress);
+  renderDashboardOverview(section, stats, overallProgress);
   renderProfileView();
+}
+
+function renderSidebarSummary(section, daysUntilExam, overallProgress) {
+  const sectionOutput = document.querySelector("#sidebar-current-section-output");
+
+  if (!sectionOutput) {
+    return;
+  }
+
+  sectionOutput.textContent = section;
+  document.querySelector("#sidebar-days-output").textContent = daysUntilExam === null ? "No date" : daysUntilExam;
+  document.querySelector("#sidebar-progress-output").textContent = `${overallProgress.percentage}%`;
+}
+
+function renderDashboardOverview(section, stats, overallProgress) {
+  const progressDetail = document.querySelector("#overall-progress-detail-output");
+
+  if (!progressDetail) {
+    return;
+  }
+
+  const scoreGap = calculateScoreGap();
+  const latestScore = profile.latestScore === "" ? "Not entered" : profile.latestScore;
+  const targetScore = profile.targetScore || 75;
+  const sectionProgressText = isSectionPassed(section)
+    ? `${section} · Passed`
+    : `${section} · ${stats.completed} / ${stats.total} modules`;
+  const sectionPercentText = isSectionPassed(section) ? "100% complete" : `${stats.progressPercent}% complete`;
+
+  progressDetail.textContent = `${overallProgress.passedCount} / ${overallProgress.totalRequired} sections passed`;
+  document.querySelector("#overall-progress-bar").style.width = `${overallProgress.percentage}%`;
+  document.querySelector("#current-section-progress-output").textContent = sectionProgressText;
+  document.querySelector("#current-section-percent-output").textContent = sectionPercentText;
+  document.querySelector("#current-section-progress-bar").style.width = `${isSectionPassed(section) ? 100 : stats.progressPercent}%`;
+  document.querySelector("#exam-readiness-output").textContent = `Latest ${latestScore} · Target ${targetScore}`;
+  document.querySelector("#score-gap-output").textContent = `${scoreGap} points`;
+  renderStudyMapPreview();
+  renderCalendarPreview();
+}
+
+function renderStudyMapPreview() {
+  const previewOutput = document.querySelector("#study-map-preview-output");
+
+  if (!previewOutput) {
+    return;
+  }
+
+  const modules = getSectionProgress(getCurrentSection())
+    .filter((moduleItem) => !isCompletedEnough(moduleItem))
+    .map((moduleItem) => ({ ...moduleItem, priorityScore: getStudyPlanPriority(moduleItem) }))
+    .sort((a, b) => b.priorityScore - a.priorityScore)
+    .slice(0, 3);
+
+  renderPreviewList(previewOutput, modules, "No priority modules yet.");
+}
+
+function renderCalendarPreview() {
+  const previewOutput = document.querySelector("#calendar-preview-output");
+
+  if (!previewOutput) {
+    return;
+  }
+
+  const todayKey = formatIsoDate(getToday());
+  const modules = getSectionProgress(getCurrentSection())
+    .filter((moduleItem) => moduleItem.plannedDate && moduleItem.plannedDate >= todayKey)
+    .sort((a, b) => a.plannedDate.localeCompare(b.plannedDate))
+    .slice(0, 3);
+
+  renderPreviewList(previewOutput, modules, "No planned modules yet.");
+}
+
+function renderPreviewList(container, modules, emptyText) {
+  container.innerHTML = "";
+
+  if (modules.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-message";
+    empty.textContent = emptyText;
+    container.append(empty);
+    return;
+  }
+
+  modules.forEach((moduleItem) => {
+    const item = document.createElement("div");
+    item.className = "preview-item";
+
+    const title = document.createElement("strong");
+    title.textContent = moduleItem.title;
+
+    const meta = document.createElement("span");
+    meta.textContent = moduleItem.plannedDate ? formatCompactDate(moduleItem.plannedDate) : normalizeStatus(moduleItem.status);
+
+    item.append(title, meta);
+    container.append(item);
+  });
 }
 
 function renderProfileView() {
