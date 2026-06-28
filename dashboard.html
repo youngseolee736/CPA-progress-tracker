@@ -7,110 +7,87 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <main class="container">
-      <header class="page-header page-header-row">
+    <main class="dashboard-shell">
+      <header class="command-header">
         <div>
+          <p class="eyebrow" id="section-eyebrow">Current section study plan</p>
           <h1>CPA Dashboard</h1>
-          <p>Track your selected CPA section roadmap, scores, and review priorities.</p>
+          <p class="hero-meta" id="days-until-exam-output">No date set</p>
         </div>
         <a class="text-button" href="index.html">Edit Setup</a>
       </header>
 
-      <section class="section" aria-labelledby="overview-title">
-        <h2 id="overview-title">Exam Overview</h2>
-
-        <dl class="summary-list">
-          <div>
-            <dt>Current Section</dt>
-            <dd id="current-section-output">Not set</dd>
-          </div>
-          <div>
-            <dt>Passed Sections</dt>
-            <dd id="passed-sections-output">None yet</dd>
-          </div>
-          <div>
-            <dt>Latest Practice Score</dt>
-            <dd id="latest-score-output">0</dd>
-          </div>
-          <div>
-            <dt>Target Score</dt>
-            <dd id="target-score-output">75</dd>
-          </div>
-          <div>
-            <dt>Score Gap</dt>
-            <dd id="score-gap-output">0 points</dd>
-          </div>
-          <div>
-            <dt>Days Until Exam</dt>
-            <dd id="days-until-exam-output">No date set</dd>
-          </div>
-        </dl>
+      <section class="metric-strip" aria-label="Dashboard metrics">
+        <article>
+          <span>Progress</span>
+          <strong id="overall-progress-output">0%</strong>
+        </article>
+        <article>
+          <span>Score Gap</span>
+          <strong id="score-gap-output">0 points</strong>
+        </article>
+        <article>
+          <span>Review Needed</span>
+          <strong id="review-needed-output">0</strong>
+        </article>
+        <article>
+          <span>Today's Focus</span>
+          <strong id="todays-focus-output">None yet</strong>
+        </article>
       </section>
 
-      <section class="section" aria-labelledby="progress-title">
-        <h2 id="progress-title">Topic Progress</h2>
+      <div class="view-tabs" role="tablist" aria-label="Dashboard views">
+        <button type="button" id="study-map-tab" class="view-tab is-active" aria-controls="study-map-view">Study Map</button>
+        <button type="button" id="calendar-plan-tab" class="view-tab" aria-controls="calendar-plan-view">Calendar Plan</button>
+      </div>
 
-        <dl class="summary-list">
-          <div>
-            <dt>Overall Progress</dt>
-            <dd id="overall-progress-output">0%</dd>
-          </div>
-          <div>
-            <dt>Completed Modules</dt>
-            <dd id="completed-modules-output">0 / 0</dd>
-          </div>
-          <div>
-            <dt>Average Module Score</dt>
-            <dd id="average-score-output">No scores yet</dd>
-          </div>
-          <div>
-            <dt>Needs Review</dt>
-            <dd id="review-needed-output">0</dd>
-          </div>
-          <div>
-            <dt>Weakest Module</dt>
-            <dd id="weakest-module-output">None yet</dd>
-          </div>
-          <div>
-            <dt>Next Priority</dt>
-            <dd id="next-priority-output">None yet</dd>
-          </div>
-        </dl>
-      </section>
-
-      <section class="section" aria-labelledby="roadmap-title">
+      <section id="study-map-view" class="dashboard-view is-active" aria-labelledby="roadmap-title">
         <div class="section-heading-row">
-          <h2 id="roadmap-title">Section Roadmap</h2>
+          <div>
+            <h2 id="roadmap-title">Study Map</h2>
+            <p id="roadmap-subtitle">Update module status, score, review flag, and planned date.</p>
+          </div>
           <span id="roadmap-section-label" class="section-label">REG</span>
         </div>
-
-        <div class="button-row plan-actions">
-          <button type="button" id="generate-plan-button" class="primary-button">Generate Study Plan</button>
-          <button type="button" id="apply-plan-button" class="secondary-button">Apply Plan to Calendar</button>
-        </div>
-
-        <section class="study-plan-panel" aria-labelledby="study-plan-title">
-          <h3 id="study-plan-title">Suggested Study Plan</h3>
-          <div id="study-plan-output" class="plan-output" aria-live="polite">
-            <p class="empty-message">Click "Generate Study Plan" to create a plan from your current progress.</p>
-          </div>
-        </section>
-
-        <section class="study-plan-panel" aria-labelledby="calendar-title">
-          <h3 id="calendar-title">Calendar View</h3>
-          <div id="calendar-output" class="plan-output" aria-live="polite">
-            <p class="empty-message">No planned module dates yet.</p>
-          </div>
-        </section>
 
         <div id="roadmap-list" class="roadmap-list" aria-live="polite"></div>
       </section>
 
-      <section class="section reset-section" aria-labelledby="controls-title">
+      <section id="calendar-plan-view" class="dashboard-view" aria-labelledby="calendar-title">
+        <div class="section-heading-row">
+          <div>
+            <h2 id="calendar-title">Calendar Plan</h2>
+            <p>Modules grouped by planned date, with unscheduled work called out.</p>
+          </div>
+        </div>
+
+        <div id="calendar-output" class="calendar-list" aria-live="polite">
+          <p class="empty-message">No planned module dates yet.</p>
+        </div>
+      </section>
+
+      <section class="study-plan-section" aria-labelledby="study-plan-title">
+        <div class="section-heading-row">
+          <div>
+            <h2 id="study-plan-title">Suggested Study Plan</h2>
+            <p>Generate a browser-only plan from your current progress and exam date.</p>
+          </div>
+          <div class="button-row plan-actions">
+            <button type="button" id="generate-plan-button" class="primary-button">Generate Study Plan</button>
+            <button type="button" id="apply-plan-button" class="secondary-button">Apply Plan to Calendar</button>
+          </div>
+        </div>
+
+        <div id="study-plan-output" class="plan-output" aria-live="polite">
+          <p class="empty-message">Click "Generate Study Plan" to create a plan from your current progress.</p>
+        </div>
+      </section>
+
+      <section class="controls-section" aria-labelledby="controls-title">
         <h2 id="controls-title">Controls</h2>
         <div class="button-row">
-          <button type="button" id="reset-section-button" class="secondary-button">Reset Current Section Progress</button>
-          <button type="button" id="reset-everything-button" class="secondary-button">Reset Everything</button>
+          <button type="button" id="reset-section-button" class="secondary-button">Reset Current Section</button>
+          <button type="button" id="reset-everything-button" class="danger-button">Reset Everything</button>
         </div>
       </section>
     </main>

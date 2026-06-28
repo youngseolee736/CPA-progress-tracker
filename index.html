@@ -6,20 +6,17 @@
     <title>CPA Progress Tracker</title>
     <link rel="stylesheet" href="style.css" />
   </head>
-  <body>
-    <main class="container">
-      <header class="page-header">
-        <h1>CPA Progress Tracker</h1>
-        <p>Build your personal CPA study dashboard.</p>
-        <p>Choose your current section and exam target to start tracking module progress.</p>
-      </header>
+  <body class="setup-page">
+    <main class="setup-shell">
+      <section class="setup-panel" aria-labelledby="setup-title">
+        <header class="setup-header">
+          <h1 id="setup-title">CPA Progress Tracker</h1>
+          <p>Build your personal CPA study dashboard.</p>
+        </header>
 
-      <section class="section" aria-labelledby="setup-title">
-        <h2 id="setup-title">Dashboard Setup</h2>
-
-        <form id="profile-form">
+        <form id="profile-form" class="setup-form">
           <label for="exam-section">
-            Current CPA section
+            Current Section
             <select id="exam-section" required>
               <option value="FAR">FAR</option>
               <option value="AUD">AUD</option>
@@ -30,8 +27,25 @@
             </select>
           </label>
 
+          <div class="form-grid">
+            <label for="exam-date">
+              Target Exam Date
+              <input id="exam-date" type="date" />
+            </label>
+
+            <label for="latest-score">
+              Latest Practice Score
+              <input id="latest-score" type="number" min="0" max="100" placeholder="0" />
+            </label>
+
+            <label for="target-score">
+              Target Score
+              <input id="target-score" type="number" min="0" max="100" value="75" />
+            </label>
+          </div>
+
           <fieldset>
-            <legend>Passed sections</legend>
+            <legend>Passed Sections</legend>
             <div class="checkbox-grid">
               <label class="checkbox-label">
                 <input type="checkbox" name="passedSections" value="FAR" />
@@ -60,29 +74,12 @@
             </div>
           </fieldset>
 
-          <div class="form-grid">
-            <label for="exam-date">
-              Target exam date
-              <input id="exam-date" type="date" />
-            </label>
-
-            <label for="latest-score">
-              Latest practice score
-              <input id="latest-score" type="number" min="0" max="100" placeholder="0" />
-            </label>
-
-            <label for="target-score">
-              Target score
-              <input id="target-score" type="number" min="0" max="100" value="75" />
-            </label>
-          </div>
-
-          <button type="submit" class="primary-button">Start Dashboard</button>
+          <button type="submit" class="primary-button">Create Dashboard</button>
           <p id="setup-message" class="message" aria-live="polite"></p>
         </form>
-      </section>
 
-      <p class="note">This app runs only in your browser. No account or login is required.</p>
+        <p class="note">Browser-only tracker. No login required.</p>
+      </section>
     </main>
 
     <script src="script.js"></script>
