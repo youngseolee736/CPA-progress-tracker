@@ -42,4 +42,10 @@ Repository link: https://github.com/youngseolee736/CPA-progress-tracker
 - Derived calculations from state
 
 ## What I Learned
+Through this project, I learned how to use vanilla JavaScript to manage application state and update the page based on user interactions. The app stores CPA profile data, section progress, module status, exam scores, review needs, and planned dates in JavaScript. 
 
+I learned how to use localStorage to save data in the browser. This lets the app remember the user's profile, passed CPA sections, scores, module progress, and calendar plan even after the page is refreshed. I also learned why objects and arrays need to be converted with `JSON.stringify()` before saving and restored with `JSON.parse()` when loading them back.
+
+I also learned how to separate raw input from derived output. For example, the app calculates overall CPA progress, current section progress, score gap, review count, today's focus, and calendar study plan from the saved state instead of showing only static values.
+
+I also learned that UI/UX design is part of front-end development. The first version looked too much like a basic form, so I redesigned it into a study dashboard with sidebar navigation, progress cards, an accordion-style study map, and a calendar view. This made the app easier to use and more like a real study planning tool.
