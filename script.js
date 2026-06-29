@@ -1,5 +1,5 @@
 const PROFILE_KEY = "cpaProgressProfile";
-const PROGRESS_KEY = "cpaRoadmapProgress";
+const PROGRESS_KEY = "cpaProgressModules";
 const LEGACY_TOPICS_KEY = "cpaProgressTopics";
 const STATUSES = ["Not Started", "In Progress", "Completed"];
 const DAY_IN_MS = 86400000;
@@ -114,6 +114,34 @@ function loadProfile() {
   }
 }
 
+function saveProfile(profileData) {
+  profile = normalizeProfile(profileData !== undefined ? profileData : profile);
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+}
+
+function clearProfile() {
+  profile = normalizeProfile({
+    currentSection: "REG",
+    selectedDiscipline: "TCP",
+    passedSections: [],
+    latestScore: "",
+    targetScore: 75,
+    examDate: "",
+  });
+  localStorage.removeItem(PROFILE_KEY);
+}
+
+function clearProgress() {
+  progress = {};
+  localStorage.removeItem(PROGRESS_KEY);
+}
+
+function clearAllData() {
+  clearProfile();
+  clearProgress();
+  localStorage.removeItem(LEGACY_TOPICS_KEY);
+}
+
 function normalizeProfile(profileData) {
   const selectedDiscipline = DISCIPLINE_SECTIONS.includes(profileData.selectedDiscipline)
     ? profileData.selectedDiscipline
@@ -148,11 +176,6 @@ function normalizePassedSections(passedSections) {
   });
 }
 
-function saveProfile() {
-  profile = normalizeProfile(profile);
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-}
-
 function loadProgress() {
   const savedProgress = localStorage.getItem(PROGRESS_KEY);
 
@@ -167,7 +190,8 @@ function loadProgress() {
   }
 }
 
-function saveProgress() {
+function saveProgress(progressData) {
+  progress = progressData !== undefined ? progressData : progress;
   localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
 }
 
@@ -555,6 +579,11 @@ function renderPassedSectionInputs() {
 }
 
 function setupDashboardPage() {
+  if (!localStorage.getItem(PROFILE_KEY)) {
+    window.location.href = "index.html";
+    return;
+  }
+
   const roadmapList = document.querySelector("#roadmap-list");
 
   if (!roadmapList) {
@@ -1163,9 +1192,7 @@ function resetCurrentSectionProgress() {
 }
 
 function resetEverything() {
-  localStorage.removeItem(PROFILE_KEY);
-  localStorage.removeItem(PROGRESS_KEY);
-  localStorage.removeItem(LEGACY_TOPICS_KEY);
+  clearAllData();
   window.location.href = "index.html";
 }
 
