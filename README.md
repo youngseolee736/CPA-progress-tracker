@@ -20,7 +20,6 @@ Repository link: https://github.com/youngseolee736/CPA-progress-tracker
 5. Reset the planner when you want to start over.
 
 ## Features
-
 - Add CPA study topics
 - Track topic section and status
 - Filter topics by section and status
