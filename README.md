@@ -8,7 +8,7 @@ GitHub Pages link: https://youngseolee736.github.io/CPA-progress-tracker/
 
 ## Repository
 
-Repository link:https://youngseolee736.github.io/CPA-progress-tracker/
+Repository link: https://github.com/youngseolee736/CPA-progress-tracker
 
 
 ## How to Use the App
