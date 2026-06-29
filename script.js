@@ -1511,11 +1511,11 @@ function getStudyPlanPriority(moduleItem) {
   }
 
   if (normalizeStatus(moduleItem.status) === "Not Started") {
-    priority += 3;
+    priority += isExam ? 3 : 7;
   }
 
   if (normalizeStatus(moduleItem.status) === "In Progress") {
-    priority += 2;
+    priority += isExam ? 2 : 4;
   }
 
   if (isExam && moduleItem.title.includes("Mini Exam")) {
