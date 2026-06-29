@@ -44,7 +44,7 @@ p {
 
 h1 {
   margin-bottom: 6px;
-  font-size: 2.15rem;
+  font-size: 1.95rem;
   line-height: 1.1;
   letter-spacing: 0;
 }
@@ -65,21 +65,22 @@ h4 {
 
 .setup-shell {
   display: grid;
-  place-items: center;
+  align-items: start;
+  justify-items: center;
   min-height: 100vh;
-  padding: 32px 16px;
+  padding: 24px 16px;
 }
 
 .setup-panel {
-  width: min(680px, 100%);
-  padding: 34px;
+  width: min(640px, 100%);
+  padding: 26px 28px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 
 .setup-header {
-  margin-bottom: 28px;
+  margin-bottom: 22px;
 }
 
 .setup-header p,
@@ -99,13 +100,13 @@ h4 {
 
 .setup-form {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .setup-group {
   display: grid;
-  gap: 10px;
-  padding-top: 16px;
+  gap: 8px;
+  padding-top: 14px;
   border-top: 1px solid var(--soft-border);
 }
 
@@ -368,6 +369,18 @@ h4 {
   margin: 0;
   color: var(--muted);
   font-weight: 700;
+}
+
+.section-pie-card .practice-message {
+  width: fit-content;
+  margin-top: 12px;
+  padding: 9px 12px;
+  color: #b42318;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 800;
 }
 
 .command-header {
@@ -703,15 +716,16 @@ form,
 .form-grid,
 .checkbox-grid {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .form-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
 
 label {
   display: grid;
+  min-width: 0;
   gap: 6px;
   color: var(--text);
   font-size: 0.86rem;
@@ -738,13 +752,14 @@ legend {
 
 .passed-section-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
 }
 
 .passed-section-row {
   display: grid;
-  grid-template-columns: minmax(86px, 0.8fr) minmax(90px, 1fr);
+  grid-template-columns: minmax(78px, 0.75fr) minmax(0, 1fr);
+  min-width: 0;
   gap: 8px;
   align-items: center;
 }
@@ -753,8 +768,8 @@ legend {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: 36px;
-  padding: 7px 9px;
+  min-height: 34px;
+  padding: 6px 9px;
   background: #fafafa;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -774,8 +789,9 @@ legend {
 input,
 select {
   width: 100%;
-  min-height: 38px;
-  padding: 7px 9px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 9px;
   color: var(--text);
   background: var(--field);
   border: 1px solid var(--border);
@@ -788,10 +804,93 @@ select:focus {
   border-color: var(--primary);
 }
 
+.date-picker {
+  position: relative;
+}
+
+.date-picker input {
+  cursor: pointer;
+}
+
+.date-picker-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: min(320px, calc(100vw - 40px));
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.16);
+}
+
+.date-picker-header {
+  display: grid;
+  grid-template-columns: 56px 1fr 56px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.date-picker-header strong {
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.date-picker-nav,
+.date-picker-day {
+  min-height: 30px;
+  padding: 4px 6px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.78rem;
+}
+
+.date-picker-nav:hover,
+.date-picker-day:hover {
+  background: #f5f6f8;
+}
+
+.date-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.date-picker-weekday,
+.date-picker-empty,
+.date-picker-day {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+}
+
+.date-picker-weekday {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.date-picker-day {
+  color: var(--text);
+}
+
+.date-picker-day.is-today {
+  border-color: #94a3b8;
+}
+
+.date-picker-day.is-selected {
+  color: #ffffff;
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
 button,
 .text-button {
-  min-height: 38px;
-  padding: 8px 14px;
+  min-height: 36px;
+  padding: 7px 13px;
   border-radius: 6px;
   font-weight: 700;
   cursor: pointer;

@@ -47,7 +47,21 @@
           <div class="form-grid">
             <label for="exam-date">
               Target Exam Date
-              <input id="exam-date" type="date" />
+              <div class="date-picker">
+                <input
+                  id="exam-date"
+                  type="text"
+                  inputmode="numeric"
+                  pattern="\d{4}-\d{2}-\d{2}"
+                  placeholder="YYYY-MM-DD"
+                  title="Use YYYY-MM-DD format"
+                  autocomplete="off"
+                  aria-haspopup="dialog"
+                  aria-expanded="false"
+                  readonly
+                />
+                <div id="exam-date-picker" class="date-picker-popover" role="dialog" aria-label="Choose target exam date" hidden></div>
+              </div>
             </label>
 
             <label for="latest-score">

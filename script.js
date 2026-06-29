@@ -6,6 +6,8 @@ const DAY_IN_MS = 86400000;
 const REQUIRED_CPA_SECTIONS = 4;
 const CORE_SECTIONS = ["FAR", "AUD", "REG"];
 const DISCIPLINE_SECTIONS = ["TCP", "BAR", "ISC"];
+const DISPLAY_LOCALE = "en-US";
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 const cpaRoadmap = {
   FAR: [
@@ -85,6 +87,7 @@ let progress = loadProgress();
 let generatedStudyPlan = null;
 let expandedModuleId = null;
 let visibleCalendarDate = getDefaultCalendarDate();
+let visibleExamDatePickerDate = getDefaultCalendarDate();
 
 function loadProfile() {
   const savedProfile = localStorage.getItem(PROFILE_KEY);
@@ -462,6 +465,8 @@ function setupProfilePage() {
   document.querySelector("#latest-score").value = profile.latestScore;
   document.querySelector("#target-score").value = profile.targetScore || 75;
   document.querySelector("#exam-date").value = profile.examDate || "";
+  visibleExamDatePickerDate = getExamDate() || getToday();
+  setupExamDatePicker();
   renderCurrentSectionOptions();
   renderPassedSectionInputs();
 
@@ -507,6 +512,148 @@ function setupProfilePage() {
     saveProfile();
     window.location.href = "dashboard.html";
   });
+}
+
+function setupExamDatePicker() {
+  const input = document.querySelector("#exam-date");
+  const picker = document.querySelector("#exam-date-picker");
+
+  if (!input || !picker) {
+    return;
+  }
+
+  renderExamDatePicker();
+
+  input.addEventListener("click", openExamDatePicker);
+  input.addEventListener("focus", openExamDatePicker);
+  input.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      closeExamDatePicker();
+    }
+  });
+
+  document.addEventListener("click", function (event) {
+    if (!event.target.closest(".date-picker")) {
+      closeExamDatePicker();
+    }
+  });
+}
+
+function openExamDatePicker() {
+  const input = document.querySelector("#exam-date");
+  const picker = document.querySelector("#exam-date-picker");
+
+  if (!input || !picker) {
+    return;
+  }
+
+  const selectedDate = parseLocalDate(input.value);
+  visibleExamDatePickerDate = selectedDate || visibleExamDatePickerDate || getToday();
+  renderExamDatePicker();
+  picker.hidden = false;
+  input.setAttribute("aria-expanded", "true");
+}
+
+function closeExamDatePicker() {
+  const input = document.querySelector("#exam-date");
+  const picker = document.querySelector("#exam-date-picker");
+
+  if (!input || !picker) {
+    return;
+  }
+
+  picker.hidden = true;
+  input.setAttribute("aria-expanded", "false");
+}
+
+function changeExamDatePickerMonth(monthOffset) {
+  visibleExamDatePickerDate = new Date(
+    visibleExamDatePickerDate.getFullYear(),
+    visibleExamDatePickerDate.getMonth() + monthOffset,
+    1
+  );
+  renderExamDatePicker();
+}
+
+function renderExamDatePicker() {
+  const input = document.querySelector("#exam-date");
+  const picker = document.querySelector("#exam-date-picker");
+
+  if (!input || !picker) {
+    return;
+  }
+
+  const selectedDate = parseLocalDate(input.value);
+  const year = visibleExamDatePickerDate.getFullYear();
+  const month = visibleExamDatePickerDate.getMonth();
+  const dates = getCalendarMonthDates(year, month);
+
+  picker.innerHTML = "";
+
+  const header = document.createElement("div");
+  header.className = "date-picker-header";
+
+  const previousButton = document.createElement("button");
+  previousButton.type = "button";
+  previousButton.className = "date-picker-nav";
+  previousButton.textContent = "Prev";
+  previousButton.addEventListener("click", function () {
+    changeExamDatePickerMonth(-1);
+  });
+
+  const monthLabel = document.createElement("strong");
+  monthLabel.textContent = visibleExamDatePickerDate.toLocaleDateString(DISPLAY_LOCALE, { month: "long", year: "numeric" });
+
+  const nextButton = document.createElement("button");
+  nextButton.type = "button";
+  nextButton.className = "date-picker-nav";
+  nextButton.textContent = "Next";
+  nextButton.addEventListener("click", function () {
+    changeExamDatePickerMonth(1);
+  });
+
+  header.append(previousButton, monthLabel, nextButton);
+
+  const grid = document.createElement("div");
+  grid.className = "date-picker-grid";
+
+  ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].forEach((weekday) => {
+    const weekdayCell = document.createElement("span");
+    weekdayCell.className = "date-picker-weekday";
+    weekdayCell.textContent = weekday;
+    grid.append(weekdayCell);
+  });
+
+  dates.forEach((date) => {
+    if (!date) {
+      const emptyCell = document.createElement("span");
+      emptyCell.className = "date-picker-empty";
+      grid.append(emptyCell);
+      return;
+    }
+
+    const dateButton = document.createElement("button");
+    dateButton.type = "button";
+    dateButton.className = "date-picker-day";
+    dateButton.textContent = date.getDate();
+
+    if (isSameDate(date, getToday())) {
+      dateButton.classList.add("is-today");
+    }
+
+    if (isSameDate(date, selectedDate)) {
+      dateButton.classList.add("is-selected");
+    }
+
+    dateButton.addEventListener("click", function () {
+      input.value = formatIsoDate(date);
+      closeExamDatePicker();
+    });
+
+    grid.append(dateButton);
+  });
+
+  picker.append(header, grid);
 }
 
 function renderCurrentSectionOptions() {
@@ -579,14 +726,14 @@ function renderPassedSectionInputs() {
 }
 
 function setupDashboardPage() {
-  if (!localStorage.getItem(PROFILE_KEY)) {
-    window.location.href = "index.html";
-    return;
-  }
-
   const roadmapList = document.querySelector("#roadmap-list");
 
   if (!roadmapList) {
+    return;
+  }
+
+  if (!localStorage.getItem(PROFILE_KEY)) {
+    window.location.href = "index.html";
     return;
   }
 
@@ -694,13 +841,14 @@ function renderDashboardOverview(section, stats, overallProgress) {
   const sectionProgressText = isSectionPassed(section)
     ? `${section} · Passed`
     : `${section} · ${stats.completed} / ${stats.total} modules`;
-  const sectionPercentText = isSectionPassed(section) ? "100% complete" : `${stats.progressPercent}% complete`;
+  const sectionPercent = isSectionPassed(section) ? 100 : stats.progressPercent;
+  const sectionPercentText = `${sectionPercent}% complete`;
 
   progressDetail.textContent = `${overallProgress.passedCount} / ${overallProgress.totalRequired} sections passed`;
   document.querySelector("#overall-progress-bar").style.width = `${overallProgress.percentage}%`;
   document.querySelector("#current-section-progress-output").textContent = sectionProgressText;
   document.querySelector("#current-section-percent-output").textContent = sectionPercentText;
-  document.querySelector("#current-section-progress-bar").style.width = `${isSectionPassed(section) ? 100 : stats.progressPercent}%`;
+  document.querySelector("#current-section-progress-bar").style.width = `${sectionPercent}%`;
   document.querySelector("#exam-readiness-output").textContent = `Latest ${latestScore} · Target ${targetScore}`;
   document.querySelector("#score-gap-output").textContent = `${scoreGap} points`;
   renderCurrentSectionPie(section, stats);
@@ -724,6 +872,12 @@ function renderCurrentSectionPie(section, stats) {
   document.querySelector("#current-section-pie-percent").textContent = `${percent}%`;
   document.querySelector("#current-section-pie-title").textContent = `${section} progress`;
   document.querySelector("#current-section-pie-detail").textContent = detail;
+
+  const practiceMessage = document.querySelector("#current-section-practice-message");
+
+  if (practiceMessage) {
+    practiceMessage.hidden = percent <= 50;
+  }
 }
 
 function renderStudyMapPreview() {
@@ -1145,7 +1299,11 @@ function createRoadmapRow(moduleItem) {
   dateLabel.textContent = "Planned";
 
   const dateInput = document.createElement("input");
-  dateInput.type = "date";
+  dateInput.type = "text";
+  dateInput.inputMode = "numeric";
+  dateInput.pattern = "\\d{4}-\\d{2}-\\d{2}";
+  dateInput.placeholder = "YYYY-MM-DD";
+  dateInput.title = "Use YYYY-MM-DD format";
   dateInput.value = moduleItem.plannedDate || "";
   dateInput.setAttribute("aria-label", `Planned date for ${moduleItem.title}`);
   dateInput.addEventListener("change", function (event) {
@@ -1203,11 +1361,12 @@ function getToday() {
 }
 
 function parseLocalDate(dateString) {
-  if (!dateString) {
+  if (!dateString || !ISO_DATE_PATTERN.test(dateString)) {
     return null;
   }
 
-  return new Date(`${dateString}T00:00:00`);
+  const date = new Date(`${dateString}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function getExamDate() {
@@ -1278,7 +1437,7 @@ function formatDisplayDate(dateString) {
     return "";
   }
 
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return date.toLocaleDateString(DISPLAY_LOCALE, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function formatCompactDate(dateString) {
@@ -1288,7 +1447,7 @@ function formatCompactDate(dateString) {
     return "No date";
   }
 
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return date.toLocaleDateString(DISPLAY_LOCALE, { month: "short", day: "numeric" });
 }
 
 function isCompletedEnough(moduleItem) {
@@ -1625,7 +1784,7 @@ function renderCalendarGrid() {
   const examDate = getExamDate();
   const finalReviewDate = getFinalReviewDate();
 
-  monthLabel.textContent = visibleCalendarDate.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  monthLabel.textContent = visibleCalendarDate.toLocaleDateString(DISPLAY_LOCALE, { month: "long", year: "numeric" });
   calendarGrid.innerHTML = "";
   unscheduledOutput.innerHTML = "";
 
