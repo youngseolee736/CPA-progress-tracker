@@ -336,6 +336,7 @@ function updateModuleProgress(moduleId, updates, shouldRenderRoadmap = false) {
   progress[section][moduleId] = { ...progress[section][moduleId], ...updates };
 
   if (shouldAutoPlan) {
+    clearCurrentSectionPlannedDates();
     generatedStudyPlan = generateStudyPlan();
     applyStudyPlanDates(generatedStudyPlan);
     renderStudyPlan(generatedStudyPlan);
@@ -1657,6 +1658,7 @@ function renderStudyPlan(plan) {
 }
 
 function generateAndApplyStudyPlan() {
+  clearCurrentSectionPlannedDates();
   generatedStudyPlan = generateStudyPlan();
   applyStudyPlanDates(generatedStudyPlan);
   saveProgress();
@@ -1698,6 +1700,18 @@ function createPlanDayElement(date, modules) {
   return dayGroup;
 }
 
+function clearCurrentSectionPlannedDates() {
+  const section = getCurrentSection();
+  const modules = getSectionProgress(section);
+
+  modules.forEach((moduleItem) => {
+    progress[section][moduleItem.id] = {
+      ...progress[section][moduleItem.id],
+      plannedDate: "",
+    };
+  });
+}
+
 function applyStudyPlanDates(plan) {
   if (!plan || plan.type !== "plan") {
     return;
@@ -1707,10 +1721,6 @@ function applyStudyPlanDates(plan) {
 
   plan.planDays.forEach((day) => {
     day.modules.forEach((moduleItem) => {
-      if (progress[section][moduleItem.id] && progress[section][moduleItem.id].plannedDate) {
-        return;
-      }
-
       progress[section][moduleItem.id] = {
         ...progress[section][moduleItem.id],
         plannedDate: day.date,
@@ -1721,6 +1731,7 @@ function applyStudyPlanDates(plan) {
 
 function applyGeneratedPlanToCalendar() {
   if (!generatedStudyPlan || generatedStudyPlan.type !== "plan") {
+    clearCurrentSectionPlannedDates();
     generatedStudyPlan = generateStudyPlan();
     renderStudyPlan(generatedStudyPlan);
   }
